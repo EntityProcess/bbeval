@@ -72,13 +72,13 @@ def get_repo_root() -> Path:
 
 def get_default_output_path(test_file: str) -> str:
     """
-    Generate default output path in results folder based on test file name.
+    Generate default output path in .speceval/results folder based on test file name.
     
     Args:
         test_file: Path to the test YAML file
         
     Returns:
-        Default output file path in results folder
+        Default output file path in .speceval/results folder
     """
     # Get the base name of the test file without extension
     test_path = Path(test_file)
@@ -90,8 +90,8 @@ def get_default_output_path(test_file: str) -> str:
     # Create output filename
     output_filename = f"{base_name}_{timestamp}.jsonl"
     
-    # Return path relative to current working directory's results folder
-    results_dir = Path.cwd() / "results"
+    # Return path relative to current working directory's .speceval/results folder
+    results_dir = Path.cwd() / ".speceval" / "results"
     return str(results_dir / output_filename)
 
 def focus_vscode_workspace(provider: str, settings: Dict = None, verbose: bool = False) -> bool:
