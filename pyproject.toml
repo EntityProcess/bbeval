@@ -33,9 +33,14 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
 ]
+windows = [
+    "pywin32>=306",
+    "psutil>=5.9.0",
+]
 
 [project.scripts]
 bbeval = "bbeval.cli:main"
+open-vscode-workspace = "bbeval.open_vscode_workspace:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

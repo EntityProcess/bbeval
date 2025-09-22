@@ -120,21 +120,17 @@ def focus_vscode_workspace(provider: str, settings: Dict = None, verbose: bool =
         return False
     
     try:
-        open_workspace_script = Path(__file__).parent.parent / "utils" / "Open-VSCodeWorkspace.ps1"
-        if open_workspace_script.exists():
-            import subprocess
-            cmd = ['pwsh', '-NoProfile', '-File', str(open_workspace_script), '-WorkspacePath', workspace_path, '-Focus']
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode == 0:
-                if verbose:
-                    print("  VS Code workspace focused successfully")
-                return True
-            else:
-                if verbose:
-                    print(f"  Warning: Failed to focus workspace (exit code {result.returncode}): {result.stderr}")
+        # Import the workspace opener from the same package
+        from .open_vscode_workspace import open_and_focus_workspace
+        
+        success = open_and_focus_workspace(workspace_path, focus=True)
+        if success:
+            if verbose:
+                print("  VS Code workspace focused successfully")
+            return True
         else:
             if verbose:
-                print(f"  Warning: Open-VSCodeWorkspace.ps1 not found at {open_workspace_script}")
+                print("  Warning: Failed to focus workspace")
     except Exception as e:
         if verbose:
             print(f"  Warning: Failed to focus VS Code workspace: {e}")
