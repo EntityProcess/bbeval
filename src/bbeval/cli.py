@@ -95,49 +95,6 @@ def get_default_output_path(test_file: str) -> str:
     results_dir = Path.cwd() / ".bbeval" / "results"
     return str(results_dir / output_filename)
 
-def focus_vscode_workspace(provider: str, settings: Dict = None, verbose: bool = False) -> bool:
-    """
-    Focus the VS Code workspace before running a test.
-    
-    Args:
-        provider: The provider name (must be 'vscode')
-        settings: Target settings containing workspace configuration
-        verbose: Whether to print verbose output
-        
-    Returns:
-        True if focus was attempted, False otherwise
-    """
-    if provider.lower() != 'vscode':
-        return False
-        
-    workspace_env_var = settings.get('workspace_env_var') if settings else None
-    if not workspace_env_var:
-        return False
-        
-    workspace_path = os.getenv(workspace_env_var)
-    if not workspace_path:
-        if verbose:
-            print(f"  Warning: Environment variable '{workspace_env_var}' is not set")
-        return False
-    
-    try:
-        # Import the workspace opener from the same package
-        from .open_vscode_workspace import open_and_focus_workspace
-        
-        success = open_and_focus_workspace(workspace_path, focus=True)
-        if success:
-            if verbose:
-                print("  VS Code workspace focused successfully")
-            return True
-        else:
-            if verbose:
-                print("  Warning: Failed to focus workspace")
-    except Exception as e:
-        if verbose:
-            print(f"  Warning: Failed to focus VS Code workspace: {e}")
-    
-    return False
-
 
 def _run_test_case_with_retries(
     test_case,
@@ -175,10 +132,6 @@ def _run_test_case_with_retries(
     while retry_count < max_attempts:
         if retry_count > 0:
             print(f"  Retry attempt {retry_count}/{max_retries} for test case: {test_case.id}")
-        
-        # Focus VS Code workspace once per attempt (including retries)
-        if not dry_run:
-            focus_vscode_workspace(provider, settings, verbose)
 
         try:
             # Build prompt inputs (without leaking expected response)

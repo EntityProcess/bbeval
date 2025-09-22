@@ -13,6 +13,26 @@ from typing import Optional, Dict, Any, Tuple
 import dspy
 from pathlib import Path
 
+def focus_vscode_workspace(workspace_env_var: str, verbose: bool = True) -> bool:
+    """Focus the VS Code workspace."""
+    if not workspace_env_var:
+        return False
+    workspace_path = os.getenv(workspace_env_var)
+    if not workspace_path:
+        if verbose:
+            print(f"  Warning: Environment variable '{workspace_env_var}' is not set for focusing.")
+        return False
+    try:
+        from .open_vscode_workspace import open_and_focus_workspace
+        success = open_and_focus_workspace(workspace_path, focus=True)
+        if success and verbose:
+            print("  VS Code workspace focused successfully.")
+        return success
+    except Exception as e:
+        if verbose:
+            print(f"  Warning: Failed to focus VS Code workspace: {e}")
+    return False
+
 class StandardLM(dspy.LM):
     """Wrapper for standard DSPy models that implements the polymorphic prediction interface."""
     
@@ -98,9 +118,10 @@ class VSCodeCopilot(dspy.BaseLM):
     Uses session-based temporary files to avoid race conditions between tests.
     """
     
-    def __init__(self, workspace_path: str, polling_timeout: int = 120, **kwargs):
+    def __init__(self, workspace_path: str, workspace_env_var: str, polling_timeout: int = 120, **kwargs):
         super().__init__(model="vscode-copilot", **kwargs)
         self.workspace_path = workspace_path
+        self.workspace_env_var = workspace_env_var
         self.polling_timeout = polling_timeout
         # Generate a unique session ID for this model instance
         self.session_id = str(uuid.uuid4())[:8]
@@ -271,6 +292,8 @@ class VSCodeCopilot(dspy.BaseLM):
 
     def forward(self, prompt: str = None, messages=None, test_case_id: str = None, instruction_files: list = None, task: str = None, **kwargs):
         """Create a request file and execute VS Code with PowerShell command to read it."""
+        focus_vscode_workspace(self.workspace_env_var, verbose=True)
+        
         from types import SimpleNamespace
 
         # Extract the actual prompt content
@@ -454,7 +477,7 @@ def create_model(provider: str, model: str, settings: Dict[str, Any] = None, **k
         
         # Extract polling timeout from kwargs, default to 120 seconds
         polling_timeout = kwargs.pop('polling_timeout', 120)
-        return VSCodeCopilot(workspace_path=workspace_path, polling_timeout=polling_timeout, **kwargs)
+        return VSCodeCopilot(workspace_path=workspace_path, workspace_env_var=workspace_env_var, polling_timeout=polling_timeout, **kwargs)
     elif provider == "anthropic":
         # Get environment variable names from target settings
         api_key_var = settings.get('api_key')
