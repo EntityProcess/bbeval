@@ -35,11 +35,11 @@ dev = [
 ]
 
 [project.scripts]
-speceval = "eval_runner.cli:main"
+speceval = "speceval.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["eval_runner*"]
+include = ["speceval*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -49,7 +49,7 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
-source = ["eval_runner"]
+source = ["speceval"]
 omit = ["tests/*", "setup.py"]
 
 [tool.coverage.report]

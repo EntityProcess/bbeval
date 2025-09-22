@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Unit tests for eval_runner.scoring module.
+Unit tests for speceval.scoring module.
 
 Tests the scoring configuration constants and functionality.
 """
 
 import unittest
 
-from eval_runner.scoring import KEY_TERM_MATCH_THRESHOLD, ACTION_WORDS
+from speceval.scoring import KEY_TERM_MATCH_THRESHOLD, ACTION_WORDS
 
 
 class TestScoringConstants(unittest.TestCase):

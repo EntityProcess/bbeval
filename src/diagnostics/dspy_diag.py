@@ -8,13 +8,13 @@ import sys
 import os
 from pathlib import Path
 
-# Add the eval_runner package to path
+# Add the speceval package to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 try:
     # Test basic imports
-    from eval_runner import TestCase, EvaluationResult
-    from eval_runner.scoring import extract_aspects, score_candidate_response
+    from speceval import TestCase, EvaluationResult
+    from speceval.scoring import extract_aspects, score_candidate_response
     
     print("✓ Basic imports successful")
     

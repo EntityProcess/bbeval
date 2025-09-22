@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit tests for eval_runner.models module.
+Unit tests for speceval.models module.
 
 Tests the VSCodeCopilot helper methods.
 """
@@ -11,7 +11,7 @@ import tempfile
 import shutil
 import os
 
-from eval_runner.models import VSCodeCopilot, AgentTimeoutError
+from speceval.models import VSCodeCopilot, AgentTimeoutError
 
 
 class TestVSCodeCopilotHelpers(unittest.TestCase):
@@ -82,7 +82,7 @@ class TestVSCodeCopilotHelpers(unittest.TestCase):
         self.assertEqual(reply_tmp.name, "default.res.tmp.md")
         self.assertEqual(reply_final.name, "default.res.md")
     
-    @patch('eval_runner.models.subprocess.run')
+    @patch('speceval.models.subprocess.run')
     def test_execute_vscode_command_success(self, mock_subprocess):
         """Test successful VS Code command execution."""
         # Setup mock subprocess result
@@ -103,7 +103,7 @@ class TestVSCodeCopilotHelpers(unittest.TestCase):
         self.assertEqual(result, "test response")
         mock_subprocess.assert_called_once()
     
-    @patch('eval_runner.models.subprocess.run')
+    @patch('speceval.models.subprocess.run')
     def test_execute_vscode_command_timeout(self, mock_subprocess):
         """Test VS Code command execution with timeout."""
         # Setup mock subprocess result

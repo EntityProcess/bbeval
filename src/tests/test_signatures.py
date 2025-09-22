@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Unit tests for eval_runner.signatures module.
+Unit tests for speceval.signatures module.
 
 Tests the signature selection logic and DSPy signature classes.
 """
 
 import unittest
 
-from eval_runner.signatures import (
+from speceval.signatures import (
     CodeReview, KnowledgeQuery, CodeGeneration,
     determine_signature_from_test_case, EvaluationModule
 )

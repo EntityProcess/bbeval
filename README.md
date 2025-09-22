@@ -4,7 +4,7 @@ Evaluates LLM/Copilot answers against `.test.yaml` specs. Results are saved as J
 
 ## Installation and Setup
 
-### Development Installation (Recommended)
+### Development Installation
 
 ```powershell
 # Install in development mode (creates proper package structure)
@@ -16,54 +16,53 @@ pip install -e ".[dev]"
 
 ### Environment Setup
 
-Copy env: `Copy-Item .env.example .env` and set keys
+Copy [.env.example](/docs/examples/simple/.env.example), rename to `.env` and set your variables.
 
-### Running Tests
+## Quick start
 
-```powershell
-# Run unit tests
-pytest
-
-# Run unit tests with coverage
-pytest --cov=eval_runner
-```
-
-## Quick start (Windows PowerShell)
-
-Run eval with custom targets file and test file:
+**Run eval with default target (Azure):**
 ```powershell
 # Using the CLI command
-speceval --target vscode_cargowise --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
+speceval --tests "c:/path/to/test.yaml"
 
 # Or using the Python module
-python -m eval_runner.cli --target vscode_cargowise --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
+python -m speceval.cli --tests "c:/path/to/test.yaml"
 ```
 
-Run eval with default target (Azure):
+**Run a specific test case in dry-run mode:**
 ```powershell
 # Using the CLI command
-speceval --tests ../../evals/development/powershell.test.yaml
+speceval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case" --dry-run
 
 # Or using the Python module
-python -m eval_runner.cli --tests ../../evals/development/powershell.test.yaml
+python -m speceval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case" --dry-run
 ```
 
-Run a specific test case in dry-run mode:
+**Or specify a target explicitly:**
 ```powershell
 # Using the CLI command
-speceval --target vscode_cargowise --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case" --dry-run
+speceval --target azure_base --tests "c:/path/to/test.yaml"
 
 # Or using the Python module
-python -m eval_runner.cli --target vscode_cargowise --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case" --dry-run
+python -m speceval.cli --target azure_base --tests "c:/path/to/test.yaml"
 ```
 
-Or specify a target explicitly:
+**Run eval with custom targets file and test file:**
 ```powershell
 # Using the CLI command
-speceval --target azure_base --tests ../../evals/development/powershell.test.yaml
+speceval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
 
 # Or using the Python module
-python -m eval_runner.cli --target azure_base --tests ../../evals/development/powershell.test.yaml
+python -m speceval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
+```
+
+**Run a specific test case by ID:**
+```
+# Using the CLI command
+speceval --tests ../../evals/development/powershell.test.yaml --test-id exit-vs-throw
+
+# Or using the Python module
+python -m speceval.cli --tests ../../evals/development/powershell.test.yaml --test-id exit-vs-throw
 ```
 
 ### Command Line Options
@@ -77,14 +76,6 @@ python -m eval_runner.cli --target azure_base --tests ../../evals/development/po
 - `--agent-timeout SECONDS`: Timeout in seconds for agent response polling (default: 120)
 - `--max-retries COUNT`: Maximum number of retries for timeout cases (default: 2)
 - `--verbose`: Verbose output
-Run a specific test case by ID:
-```
-# Using the CLI command
-speceval --tests ../../evals/development/powershell.test.yaml --test-id exit-vs-throw
-
-# Or using the Python module
-python -m eval_runner.cli --tests ../../evals/development/powershell.test.yaml --test-id exit-vs-throw
-```
 
 Output goes to `results/{testname}_{timestamp}.jsonl` unless `--out` is provided.
 
@@ -98,11 +89,6 @@ Environment keys (configured via targets.yaml):
 - Azure: Set environment variables specified in your target's `settings.endpoint`, `settings.api_key`, and `settings.model`
 - Anthropic: Set environment variables specified in your target's `settings.api_key` and `settings.model`
 - VS Code: Set environment variable specified in your target's `settings.workspace_env_var` → `.code-workspace` path
-
-Default variable names (when using provided targets.yaml):
-- `AZURE_OPEN_AI_ENDPOINT`, `AZURE_OPEN_AI_API_KEY`, `LLM_MODEL`
-- `ANTHROPIC_API_KEY`, `LLM_MODEL`
-- `EVAL_CARGOWISE_WORKSPACE_PATH`
 
 ## Targets and Environment Variables
 
@@ -144,56 +130,6 @@ Each target specifies:
     workspace_env_var: "EVAL_PROJECTX_WORKSPACE_PATH"
 ```
 
-### Environment Variable Mapping
-
-The `settings` section maps configuration keys to your environment variable names. This allows you to:
-- Use existing environment variables without renaming them
-- Support multiple configurations (dev, staging, prod) with different variable names
-- Keep credentials separate from code
-
-Set your environment variables to match what you've defined in `targets.yaml`:
-```bash
-# For azure_base target
-export AZURE_OPEN_AI_ENDPOINT="https://your-endpoint.openai.azure.com/"
-export AZURE_OPEN_AI_API_KEY="your-api-key"
-export LLM_MODEL="gpt-4"
-
-# For azure_custom target  
-export CUSTOM_AZURE_ENDPOINT="https://staging-endpoint.openai.azure.com/"
-export CUSTOM_AZURE_KEY="staging-api-key"
-export CUSTOM_MODEL="gpt-4-staging"
-```
-
-## Run examples (Windows PowerShell)
-
-**Default target (uses azure provider):**
-```
-speceval --tests evals/example.test.yaml
-```
-
-**Azure (base LLM):**
-```
-speceval --target azure_base --tests evals/example.test.yaml
-```
-
-**VS Code (Copilot):**
-```
-speceval --target vscode_projectx --tests evals/example.test.yaml
-```
-
-**Run specific test case by ID:**
-```
-speceval --tests evals/example.test.yaml --test-id example-test-case-1
-```
-
-Common flags:
-- `--target <name>` execution target (default: default)
-- `--test-id <id>` run only the test case with this specific ID
-- `--out results/custom.jsonl` custom output file
-- `--model <id>` override model per run
-- `--agent-timeout <seconds>` timeout for agent response polling (default: 120)
-- `--max-retries <count>` maximum retries for timeout cases (default: 2)
-
 ## Timeout handling and retries
 
 When using VS Code Copilot or other agents that may experience timeouts, the evaluator includes automatic retry functionality:
@@ -205,7 +141,7 @@ When using VS Code Copilot or other agents that may experience timeouts, the eva
 
 Example with custom timeout settings:
 ```
-speceval --target vscode_projectx --tests evals/cargowise/base.test.yaml --agent-timeout 180 --max-retries 3
+speceval --target vscode_projectx --tests evals/projectx/example.test.yaml --agent-timeout 180 --max-retries 3
 ```
 
 ## How the evals work
@@ -214,37 +150,22 @@ For each testcase in a `.test.yaml` file:
 1) Parse YAML; collect only user messages (inline text and referenced files)
 2) Extract code blocks from text for structured prompting
 3) Select a domain-specific DSPy Signature; generate a candidate answer via provider/model
-4) Score deterministically against the hidden expected answer by aspect coverage (the expected answer is never included in prompts)
+4) Score against the hidden expected answer (the expected answer is never included in prompts)
 5) Append a JSONL line and print a summary
 
 ### VS Code Copilot target
 
-- Opens your configured workspace (`EVAL_CARGOWISE_WORKSPACE_PATH`) then runs: `code chat -r "{prompt}"`.
+- Opens your configured workspace (`PROJECTX_WORKSPACE_PATH`) then runs: `code chat -r "{prompt}"`.
 - The prompt is built from the `.test.yaml` user content (task, files, code blocks); the expected assistant answer is never included.
-- Copilot is instructed to write its final answer to `scripts/agent-eval/.vscode-copilot/{test-case-id}.res.md`.
-- If VS Code takes a moment, the runner polls up to ~30s for the reply file.
+- Copilot is instructed to write its final answer to `.speceval/vscode-copilot/{test-case-id}.res.md`.
 
 ### Prompt file creation
 
 When using VS Code targets (or dry-run mode), the evaluator creates individual prompt files for each test case:
 
-- **Location**: `scripts/agent-eval/.vscode-copilot/`
+- **Location**: `.speceval/vscode-copilot/`
 - **Naming**: `{test-case-id}.req.md`
 - **Format**: Contains instruction file references, reply path, and the question/task
-
-**Manual execution example:**
-```powershell
-# After running the evaluator, you can manually execute prompts:
-code chat -r "Run command Get-Content -Raw -LiteralPath C:\git\GitHub\WiseTechGlobal\WTG.AI.Prompts_1\scripts\agent-eval\.vscode-copilot\comprehensive-review-issues.req.md and follow its instructions."
-
-# Or use the helper script:
-.\run-prompt-with-vscode.ps1 -PromptFileName "comprehensive-review-issues.req.md"
-```
-
-**Workflow:**
-1. Run evaluator: `speceval --target vscode_cargowise --tests ../../evals/development/powershell.test.yaml`
-2. Find prompt files in `.vscode-copilot/` directory (e.g., `comprehensive-review-issues.req.md`)
-3. Manually run specific prompts as needed using PowerShell + VS Code chat
 
 ## Scoring and outputs
 
@@ -256,6 +177,6 @@ Scoring:
 - Score = hits / total aspects; report `hits`, `misses`, `expected_aspect_count`
 
 Output file:
-- Default: `results/{testname}_{YYYYMMDD_HHMMSS}.jsonl` (or use `--out`)
+- Default: `.speceval/results/{testname}_{YYYYMMDD_HHMMSS}.jsonl` (or use `--out`)
 - Fields: `test_id`, `score`, `hits`, `misses`, `model_answer`, `expected_aspect_count`, `provider`, `model`, `timestamp`
 
