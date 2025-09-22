@@ -30,11 +30,10 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         self.evaluation_module.return_value = Mock(answer="Mock review response")
         
     @patch('bbeval.cli.determine_signature_from_test_case')
-    @patch('bbeval.cli.focus_vscode_workspace')
     @patch('bbeval.cli.build_prompt_inputs')
     @patch('bbeval.cli.evaluate_test_case')
     @patch('bbeval.cli.write_result_line')
-    def test_successful_execution(self, mock_write, mock_evaluate, mock_build_prompt, mock_focus, mock_determine_sig):
+    def test_successful_execution(self, mock_write, mock_evaluate, mock_build_prompt, mock_determine_sig):
         """Test successful test case execution without retries."""
         # Setup mocks
         from bbeval.signatures import CodeReview  # Import a non-CodeGeneration signature
@@ -68,16 +67,14 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         )
         
         self.assertEqual(result, mock_result)
-        mock_focus.assert_called_once()
         mock_build_prompt.assert_called_once()
         mock_evaluate.assert_called_once()
         mock_write.assert_not_called()  # No output file specified
     
     @patch('bbeval.cli.determine_signature_from_test_case')
-    @patch('bbeval.cli.focus_vscode_workspace')
     @patch('bbeval.cli.build_prompt_inputs')
     @patch('bbeval.cli.evaluate_test_case')
-    def test_agent_timeout_with_retry(self, mock_evaluate, mock_build_prompt, mock_focus, mock_determine_sig):
+    def test_agent_timeout_with_retry(self, mock_evaluate, mock_build_prompt, mock_determine_sig):
         """Test agent timeout handling with successful retry."""
         # Setup mocks - first call raises timeout, second succeeds
         from bbeval.signatures import CodeReview  # Import a non-CodeGeneration signature
@@ -115,9 +112,8 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         self.assertEqual(result, mock_result)
         self.assertEqual(self.evaluation_module.call_count, 2)
     
-    @patch('bbeval.cli.focus_vscode_workspace')
     @patch('bbeval.cli.build_prompt_inputs')
-    def test_max_retries_exceeded(self, mock_build_prompt, mock_focus):
+    def test_max_retries_exceeded(self, mock_build_prompt):
         """Test handling when max retries are exceeded."""
         mock_build_prompt.return_value = {"prompt": "test prompt"}
         self.evaluation_module.side_effect = AgentTimeoutError("Persistent timeout")
@@ -142,10 +138,9 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
     
     @patch('bbeval.cli.dspy.Predict')
     @patch('bbeval.cli.determine_signature_from_test_case')
-    @patch('bbeval.cli.focus_vscode_workspace')
     @patch('bbeval.cli.build_prompt_inputs')
     @patch('bbeval.cli.write_result_line')
-    def test_code_generation_llm_judge(self, mock_write, mock_build_prompt, mock_focus, mock_determine_sig, mock_dspy_predict):
+    def test_code_generation_llm_judge(self, mock_write, mock_build_prompt, mock_determine_sig, mock_dspy_predict):
         """Test LLM judge path for CodeGeneration test cases."""
         from bbeval.signatures import CodeGeneration
         
