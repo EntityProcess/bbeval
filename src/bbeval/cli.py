@@ -13,7 +13,8 @@ import yaml
 from pathlib import Path
 from typing import List, Dict
 import statistics
-from datetime import datetime
+from datetime import datetime, timezone
+import dspy
 
 # Import dotenv for later use
 try:
@@ -25,7 +26,7 @@ except ImportError:
 from . import EvaluationResult
 from .yaml_parser import load_testcases, build_prompt_inputs
 from .models import configure_dspy_model, AgentTimeoutError
-from .signatures import EvaluationModule, determine_signature_from_test_case
+from .signatures import EvaluationModule, determine_signature_from_test_case, CodeGeneration, CodeComparisonJudge
 from .scoring import evaluate_test_case
 
 def load_targets(targets_file_path: str = None) -> List[Dict]:
@@ -151,7 +152,7 @@ def _run_test_case_with_retries(
     max_retries: int
 ) -> EvaluationResult:
     """
-    Execute a single test case with retry logic for timeout handling.
+    Execute a single test case with retry logic and conditional judging.
     
     Args:
         test_case: The test case to execute
@@ -191,10 +192,37 @@ def _run_test_case_with_retries(
             prediction = evaluation_module(test_case_id=test_case.id, **prompt_inputs)
             candidate_response = prediction.answer
             
-            # Evaluate the response
-            print(f"  Evaluating response...")
-            result = evaluate_test_case(test_case, candidate_response, provider, model)
-            
+            # Determine which signature class was used to decide evaluation method
+            signature_class = determine_signature_from_test_case(test_case)
+
+            if signature_class is CodeGeneration:
+                # Use LLM judge for code generation tasks
+                print("  Using LLM Judge for direct code comparison...")
+                
+                llm_judge = dspy.Predict(CodeComparisonJudge)
+                judgement = llm_judge(
+                    outcome=test_case.outcome,
+                    task_requirements=test_case.task,
+                    reference_code=test_case.expected_assistant_raw,
+                    generated_code=candidate_response
+                )
+                
+                result = EvaluationResult(
+                    test_id=test_case.id,
+                    score=float(judgement.score),
+                    hits=[judgement.reasoning],
+                    misses=[],
+                    model_answer=candidate_response,
+                    expected_aspect_count=1,
+                    provider=provider,
+                    model=model,
+                    timestamp=datetime.now(timezone.utc).isoformat()
+                )
+            else:
+                # Use heuristic scorer for other test types
+                print(f"  Evaluating response with heuristic scorer...")
+                result = evaluate_test_case(test_case, candidate_response, provider, model)
+
             print(f"  Score: {result.score:.2f} ({result.hit_count}/{result.expected_aspect_count} aspects)")
             
             # Write result immediately if output file specified
@@ -250,6 +278,7 @@ def _run_test_case_with_retries(
             if verbose:
                 import traceback
                 traceback.print_exc()
+            
             # Create error result
             error_result = EvaluationResult(
                 test_id=test_case.id,
