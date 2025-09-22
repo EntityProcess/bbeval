@@ -25,13 +25,18 @@ import sys
 import time
 from pathlib import Path
 
+# Check if we're on Windows
+_IS_WINDOWS = sys.platform == "win32"
+
 # Try to import Windows-specific modules. They are only needed for the --focus feature.
-try:
-    import win32con
-    import win32gui
-    _IS_WINDOWS = sys.platform == "win32"
-except ImportError:
-    _IS_WINDOWS = False
+_HAS_WIN32_MODULES = False
+if _IS_WINDOWS:
+    try:
+        import win32con
+        import win32gui
+        _HAS_WIN32_MODULES = True
+    except ImportError:
+        pass  # Modules not available, focus feature will be disabled
 
 
 def parse_dotenv(file_path: Path) -> dict[str, str]:
@@ -90,6 +95,9 @@ def focus_vscode_window(workspace_path: Path) -> bool:
     On Windows, polls for and attempts to bring the VS Code window to the foreground.
     This is a best-effort operation.
     """
+    if not _HAS_WIN32_MODULES:
+        return False
+        
     title_key = workspace_path.stem  # Filename without extension
     deadline = time.monotonic() + 10  # 10-second timeout
     
@@ -165,9 +173,12 @@ def open_and_focus_workspace(workspace_path: str, focus: bool = False) -> bool:
         focused = False
         if focus:
             if _IS_WINDOWS:
-                # Give VS Code a moment to start before trying to focus
-                time.sleep(1.0)
-                focused = focus_vscode_window(ws_path)
+                if _HAS_WIN32_MODULES:
+                    # Give VS Code a moment to start before trying to focus
+                    time.sleep(1.0)
+                    focused = focus_vscode_window(ws_path)
+                else:
+                    print("Focus requested but win32 modules not available; skipping focus.", file=sys.stderr)
             else:
                 print("Focus requested but OS is not Windows; skipping focus.", file=sys.stderr)
         
@@ -209,7 +220,10 @@ def main():
         focused = False
         if args.focus:
             if _IS_WINDOWS:
-                focused = focus_vscode_window(ws_path)
+                if _HAS_WIN32_MODULES:
+                    focused = focus_vscode_window(ws_path)
+                else:
+                    print("Focus requested but win32 modules not available; skipping focus.", file=sys.stderr)
             else:
                 print("Focus requested but OS is not Windows; skipping focus.", file=sys.stderr)
         

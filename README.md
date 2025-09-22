@@ -58,8 +58,14 @@ Follow these steps if you want to contribute to the `bbeval` project itself. Thi
 	This command installs `bbeval` in editable (`-e`) mode and includes the extra tools needed for development and testing (`[dev]`).
 
     ```bash
+    # For non-Windows or if you don't need VS Code focus functionality
     uv pip install -e ".[dev]"
+    
+    # For Windows users who want the VS Code focus functionality
+    uv pip install -e ".[dev,windows]"
     ```
+
+    **Note:** The `windows` optional dependency includes `pywin32` and `psutil`, which are needed for the `--focus` flag with the `open_vscode_workspace.py` script. Without them, the script will work but skip the window focusing feature.
 
 You are now ready to start development. You can run the tool with `bbeval`, edit the code in `src/`, and run tests with `pytest`.
 
@@ -224,3 +230,37 @@ uv tool install bbeval
 ```
 
 This forces uv to fetch fresh package metadata from PyPI instead of using potentially stale cached information.
+
+### Troubleshooting Local Development
+
+**Windows: "Focus requested but win32 modules not available" error:**
+
+If you encounter this error when using the `--focus` flag with VS Code workspace opening:
+
+1. Ensure you're in the activated virtual environment:
+   ```bash
+   # Check if you're in the virtual environment
+   python -c "import sys; print(sys.executable)"
+   # Should show a path containing .venv
+   ```
+
+2. Install the required Windows modules in your virtual environment:
+   ```bash
+   # Option 1: Reinstall with Windows dependencies
+   uv pip install -e ".[dev,windows]"
+   
+   # Option 2: Install Windows dependencies separately
+   uv pip install pywin32 psutil
+   ```
+
+3. If installation fails with permission errors, try:
+   ```bash
+   uv pip install --target .venv\Lib\site-packages pywin32 psutil
+   ```
+
+**Virtual environment not activating properly:**
+
+- On Windows PowerShell, you may need to enable script execution:
+  ```powershell
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+  ```
