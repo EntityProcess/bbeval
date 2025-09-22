@@ -10,11 +10,11 @@ from unittest.mock import Mock, patch
 
 from bbeval import EvaluationResult
 from bbeval.models import AgentTimeoutError
-from bbeval.cli import _run_test_case_with_retries
+from bbeval.cli import _run_test_case_grading
 
 
 class TestRunTestCaseWithRetries(unittest.TestCase):
-    """Test cases for the _run_test_case_with_retries helper function."""
+    """Test cases for the _run_test_case_grading helper function."""
     
     def setUp(self):
         """Set up test fixtures."""
@@ -25,6 +25,7 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         self.test_case.outcome = "Test outcome for code review"
         self.test_case.task = "Review the following code for best practices"
         self.test_case.expected_assistant_raw = "Expected code output"
+        self.test_case.grader = "heuristic"  # Default grader type
         
         self.evaluation_module = Mock()
         self.evaluation_module.return_value = Mock(answer="Mock review response")
@@ -39,7 +40,7 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         
     @patch('bbeval.cli.determine_signature_from_test_case')
     @patch('bbeval.cli.build_prompt_inputs')
-    @patch('bbeval.cli.evaluate_test_case')
+    @patch('bbeval.cli.grade_test_case_heuristic')
     @patch('bbeval.cli.write_result_line')
     def test_successful_execution(self, mock_write, mock_evaluate, mock_build_prompt, mock_determine_sig):
         """Test successful test case execution without retries."""
@@ -61,7 +62,7 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         )
         mock_evaluate.return_value = mock_result
         
-        result = _run_test_case_with_retries(
+        result = _run_test_case_grading(
             test_case=self.test_case,
             evaluation_module=self.evaluation_module,
             repo_root="/test/repo",
@@ -83,7 +84,7 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
     
     @patch('bbeval.cli.determine_signature_from_test_case')
     @patch('bbeval.cli.build_prompt_inputs')
-    @patch('bbeval.cli.evaluate_test_case')
+    @patch('bbeval.cli.grade_test_case_heuristic')
     def test_agent_timeout_with_retry(self, mock_evaluate, mock_build_prompt, mock_determine_sig):
         """Test agent timeout handling with successful retry."""
         # Setup mocks - first call raises timeout, second succeeds
@@ -106,7 +107,7 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         self.evaluation_module.side_effect = [AgentTimeoutError("Timeout"), Mock(answer="Success")]
         mock_evaluate.return_value = mock_result
         
-        result = _run_test_case_with_retries(
+        result = _run_test_case_grading(
             test_case=self.test_case,
             evaluation_module=self.evaluation_module,
             repo_root="/test/repo",
@@ -130,7 +131,7 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         mock_build_prompt.return_value = {"prompt": "test prompt"}
         self.evaluation_module.side_effect = AgentTimeoutError("Persistent timeout")
         
-        result = _run_test_case_with_retries(
+        result = _run_test_case_grading(
             test_case=self.test_case,
             evaluation_module=self.evaluation_module,
             repo_root="/test/repo",
@@ -151,15 +152,21 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         self.assertEqual(self.evaluation_module.call_count, 2)  # Initial + 1 retry
     
     @patch('bbeval.cli.dspy.Predict')
-    @patch('bbeval.cli.determine_signature_from_test_case')
     @patch('bbeval.cli.build_prompt_inputs')
     @patch('bbeval.cli.write_result_line')
-    def test_code_generation_llm_judge(self, mock_write, mock_build_prompt, mock_determine_sig, mock_dspy_predict):
-        """Test LLM judge path for CodeGeneration test cases."""
-        from bbeval.signatures import CodeGeneration
+    def test_code_generation_llm_judge(self, mock_write, mock_build_prompt, mock_dspy_predict):
+        """Test LLM judge path for llm_judge grader configuration."""
+        
+        # Setup test case with llm_judge grader
+        test_case = Mock()
+        test_case.id = "test_case_123"
+        test_case.guideline_paths = []
+        test_case.outcome = "Test outcome for code review"
+        test_case.task = "Review the following code for best practices"
+        test_case.expected_assistant_raw = "Expected code output"
+        test_case.grader = "llm_judge"  # Use LLM judge
         
         # Setup mocks
-        mock_determine_sig.return_value = CodeGeneration
         mock_build_prompt.return_value = {"prompt": "test prompt"}
         
         # Mock the LLM judge
@@ -167,8 +174,8 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         mock_judge_instance.return_value = Mock(score="0.85", reasoning="Well implemented code")
         mock_dspy_predict.return_value = mock_judge_instance
         
-        result = _run_test_case_with_retries(
-            test_case=self.test_case,
+        result = _run_test_case_grading(
+            test_case=test_case,
             evaluation_module=self.evaluation_module,
             repo_root="/test/repo",
             provider="test",
@@ -185,10 +192,10 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         # Verify LLM judge was used
         mock_dspy_predict.assert_called_once()
         mock_judge_instance.assert_called_once_with(
-            outcome=self.test_case.outcome,
-            task_requirements=self.test_case.task,
-            reference_code=self.test_case.expected_assistant_raw,
-            generated_code="Mock review response"
+            key_principle=test_case.outcome,
+            task_requirements=test_case.task,
+            reference_answer=test_case.expected_assistant_raw,
+            generated_answer="Mock review response"
         )
         
         # Verify result structure

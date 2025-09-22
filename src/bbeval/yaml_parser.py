@@ -140,7 +140,8 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
             expected_assistant_raw=expected_assistant,
             guideline_paths=guideline_paths,
             code_snippets=code_snippets,
-            outcome=raw_test['outcome']
+            outcome=raw_test['outcome'],
+            grader=raw_test.get('grader', 'heuristic')  # Default to 'heuristic' if not specified
         )
         
         test_cases.append(test_case)

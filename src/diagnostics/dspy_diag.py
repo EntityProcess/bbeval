@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 try:
     # Test basic imports
     from bbeval import TestCase, EvaluationResult
-    from bbeval.scoring import extract_aspects, score_candidate_response
+    from bbeval.grading import extract_aspects, score_candidate_response
     
     print("✓ Basic imports successful")
     

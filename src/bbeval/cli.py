@@ -26,8 +26,8 @@ except ImportError:
 from . import EvaluationResult
 from .yaml_parser import load_testcases, build_prompt_inputs
 from .models import configure_dspy_model, AgentTimeoutError
-from .signatures import EvaluationModule, determine_signature_from_test_case, CodeGeneration, CodeComparisonJudge
-from .scoring import evaluate_test_case
+from .signatures import EvaluationModule, determine_signature_from_test_case, CodeGeneration, CodeComparisonJudge, QualityGrader
+from .grading import grade_test_case_heuristic
 
 def load_targets(targets_file_path: str = None) -> List[Dict]:
     """Load execution targets from a YAML file."""
@@ -145,7 +145,7 @@ def get_default_output_path(test_file: str) -> str:
     return str(results_dir / output_filename)
 
 
-def _run_test_case_with_retries(
+def _run_test_case_grading(
     test_case,
     evaluation_module,
     repo_root: str,
@@ -198,12 +198,10 @@ def _run_test_case_with_retries(
             prediction = evaluation_module(test_case_id=test_case.id, **prompt_inputs)
             candidate_response = prediction.answer
             
-            # Determine which signature class was used to decide evaluation method
-            signature_class = determine_signature_from_test_case(test_case)
-
-            if signature_class is CodeGeneration:
-                # Use LLM judge for code generation tasks
-                print("  Using LLM Judge for direct code comparison...")
+            # Use grader configuration from test case
+            if test_case.grader == 'llm_judge':
+                # Use LLM grader
+                print("  Using LLM Judge for grading...")
                 
                 # For VSCode provider, we need to temporarily switch to a standard model for judging
                 # to avoid double JSON wrapping and incorrect file naming
@@ -218,12 +216,12 @@ def _run_test_case_with_retries(
                         dspy.settings.configure(lm=judge_model)
                         print(f"  Successfully switched to judge model for LLM judging...")
                         
-                        llm_judge = dspy.Predict(CodeComparisonJudge)
+                        llm_judge = dspy.Predict(QualityGrader)
                         judgement = llm_judge(
-                            outcome=test_case.outcome,
+                            key_principle=test_case.outcome,
                             task_requirements=test_case.task,
-                            reference_code=test_case.expected_assistant_raw,
-                            generated_code=candidate_response
+                            reference_answer=test_case.expected_assistant_raw,
+                            generated_answer=candidate_response
                         )
                     except Exception as e:
                         print(f"  Warning: Failed to create judge model, falling back to mock: {e}")
@@ -232,24 +230,24 @@ def _run_test_case_with_retries(
                         judge_model = create_model("mock", "mock-model")
                         dspy.settings.configure(lm=judge_model)
                         
-                        llm_judge = dspy.Predict(CodeComparisonJudge)
+                        llm_judge = dspy.Predict(QualityGrader)
                         judgement = llm_judge(
-                            outcome=test_case.outcome,
+                            key_principle=test_case.outcome,
                             task_requirements=test_case.task,
-                            reference_code=test_case.expected_assistant_raw,
-                            generated_code=candidate_response
+                            reference_answer=test_case.expected_assistant_raw,
+                            generated_answer=candidate_response
                         )
                     finally:
                         # Restore original model
                         print(f"  Restoring original VSCode model...")
                         dspy.settings.configure(lm=original_lm)
                 else:
-                    llm_judge = dspy.Predict(CodeComparisonJudge)
+                    llm_judge = dspy.Predict(QualityGrader)
                     judgement = llm_judge(
-                        outcome=test_case.outcome,
+                        key_principle=test_case.outcome,
                         task_requirements=test_case.task,
-                        reference_code=test_case.expected_assistant_raw,
-                        generated_code=candidate_response
+                        reference_answer=test_case.expected_assistant_raw,
+                        generated_answer=candidate_response
                     )
                 
                 result = EvaluationResult(
@@ -264,9 +262,9 @@ def _run_test_case_with_retries(
                     timestamp=datetime.now(timezone.utc).isoformat()
                 )
             else:
-                # Use heuristic scorer for other test types
-                print(f"  Evaluating response with heuristic scorer...")
-                result = evaluate_test_case(test_case, candidate_response, provider, model)
+                # Use heuristic grader (default)
+                print(f"  Evaluating response with heuristic grader...")
+                result = grade_test_case_heuristic(test_case, candidate_response, provider, model)
 
             print(f"  Score: {result.score:.2f} ({result.hit_count}/{result.expected_aspect_count} aspects)")
             
@@ -427,7 +425,7 @@ def run_evaluation(test_file: str,
         
         print(f"  Using signature: {signature_class.__name__}")
         
-        result = _run_test_case_with_retries(
+        result = _run_test_case_grading(
             test_case=test_case,
             evaluation_module=evaluation_module,
             repo_root=repo_root,

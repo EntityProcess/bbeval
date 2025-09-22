@@ -26,6 +26,7 @@ class TestCase:
     guideline_paths: list[str]         # paths to guideline files
     code_snippets: list[str]          # extracted code blocks from segments
     outcome: str                       # expected outcome description for signature selection
+    grader: str = 'heuristic'          # grading method: 'heuristic' or 'llm_judge'
 
 @dataclass
 class EvaluationResult:

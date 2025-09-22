@@ -228,9 +228,9 @@ def detect_potential_hallucinations(candidate: str,
     
     return unique_hallucinations
 
-def evaluate_test_case(test_case, candidate_response: str, provider: str, model: str) -> EvaluationResult:
+def grade_test_case_heuristic(test_case, candidate_response: str, provider: str, model: str) -> EvaluationResult:
     """
-    Evaluate a single test case against the candidate response.
+    Grade a single test case against the candidate response using heuristic scoring.
     
     Args:
         test_case: TestCase object

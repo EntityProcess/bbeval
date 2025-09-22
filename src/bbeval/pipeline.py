@@ -13,7 +13,7 @@ from . import TestCase, EvaluationResult
 from .yaml_parser import load_testcases, build_prompt_inputs
 from .models import configure_dspy_model, AgentTimeoutError
 from .signatures import EvaluationModule, determine_signature_from_test_case
-from .scoring import evaluate_test_case
+from .grading import grade_test_case_heuristic
 
 class EvaluationPipeline:
     """
@@ -98,7 +98,7 @@ class EvaluationPipeline:
                     candidate_response = prediction.review
                     
                     # Evaluate response
-                    result = evaluate_test_case(
+                    result = grade_test_case_heuristic(
                         test_case, 
                         candidate_response, 
                         self.provider, 

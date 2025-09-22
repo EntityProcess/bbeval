@@ -7,7 +7,7 @@ Tests the scoring configuration constants and functionality.
 
 import unittest
 
-from bbeval.scoring import KEY_TERM_MATCH_THRESHOLD, ACTION_WORDS
+from bbeval.grading import KEY_TERM_MATCH_THRESHOLD, ACTION_WORDS
 
 
 class TestScoringConstants(unittest.TestCase):
