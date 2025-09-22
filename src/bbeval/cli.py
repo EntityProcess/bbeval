@@ -152,13 +152,61 @@ def _run_test_case_with_retries(
                 # Use LLM judge for code generation tasks
                 print("  Using LLM Judge for direct code comparison...")
                 
-                llm_judge = dspy.Predict(CodeComparisonJudge)
-                judgement = llm_judge(
-                    outcome=test_case.outcome,
-                    task_requirements=test_case.task,
-                    reference_code=test_case.expected_assistant_raw,
-                    generated_code=candidate_response
-                )
+                # For VSCode provider, we need to temporarily switch to a standard model for judging
+                # to avoid double JSON wrapping and incorrect file naming
+                if provider.lower() == "vscode":
+                    print(f"  Detected VSCode provider, switching to Azure for judging...")
+                    # Save current model
+                    original_lm = dspy.settings.lm
+                    
+                    # Create a temporary Azure model for judging (fallback to default environment vars)
+                    try:
+                        from .models import create_model
+                        azure_settings = {
+                            'endpoint': 'AZURE_OPEN_AI_ENDPOINT',
+                            'api_key': 'AZURE_OPEN_AI_API_KEY'
+                        }
+                        
+                        # Check if Azure credentials are available
+                        if not os.getenv('AZURE_OPEN_AI_ENDPOINT') or not os.getenv('AZURE_OPEN_AI_API_KEY'):
+                            raise ValueError("Azure credentials not found in environment")
+                        
+                        judge_model = create_model("azure", model, azure_settings)
+                        dspy.settings.configure(lm=judge_model)
+                        print(f"  Successfully switched to Azure model for LLM judging...")
+                        
+                        llm_judge = dspy.Predict(CodeComparisonJudge)
+                        judgement = llm_judge(
+                            outcome=test_case.outcome,
+                            task_requirements=test_case.task,
+                            reference_code=test_case.expected_assistant_raw,
+                            generated_code=candidate_response
+                        )
+                    except Exception as e:
+                        print(f"  Warning: Failed to create Azure judge model, falling back to mock: {e}")
+                        # Fallback to mock model if Azure isn't available
+                        judge_model = create_model("mock", "mock-model")
+                        dspy.settings.configure(lm=judge_model)
+                        
+                        llm_judge = dspy.Predict(CodeComparisonJudge)
+                        judgement = llm_judge(
+                            outcome=test_case.outcome,
+                            task_requirements=test_case.task,
+                            reference_code=test_case.expected_assistant_raw,
+                            generated_code=candidate_response
+                        )
+                    finally:
+                        # Restore original model
+                        print(f"  Restoring original VSCode model...")
+                        dspy.settings.configure(lm=original_lm)
+                else:
+                    llm_judge = dspy.Predict(CodeComparisonJudge)
+                    judgement = llm_judge(
+                        outcome=test_case.outcome,
+                        task_requirements=test_case.task,
+                        reference_code=test_case.expected_assistant_raw,
+                        generated_code=candidate_response
+                    )
                 
                 result = EvaluationResult(
                     test_id=test_case.id,

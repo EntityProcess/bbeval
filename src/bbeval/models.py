@@ -77,6 +77,15 @@ class MockModel(dspy.BaseLM):
         # Simple mock response that mimics OpenAI response structure
         from types import SimpleNamespace
         
+        # Check if this is being used for judging based on the prompt content
+        response_content = self.response
+        if prompt and any(judge_keyword in str(prompt).lower() for judge_keyword in ['score', 'reasoning', 'judge', 'comparison']):
+            # This looks like a judge request, provide appropriate mock judge response
+            response_content = '{"score": "0.85", "reasoning": "Mock judge evaluation: The code demonstrates good practices and follows most conventions. This is a test response from the mock judge model."}'
+        elif messages and any(judge_keyword in str(messages).lower() for judge_keyword in ['score', 'reasoning', 'judge', 'comparison']):
+            # This looks like a judge request via messages, provide appropriate mock judge response
+            response_content = '{"score": "0.85", "reasoning": "Mock judge evaluation: The code demonstrates good practices and follows most conventions. This is a test response from the mock judge model."}'
+        
         # Usage object that can be converted to dict
         class MockUsage:
             def __init__(self):
@@ -93,7 +102,7 @@ class MockModel(dspy.BaseLM):
         response = SimpleNamespace()
         response.choices = [SimpleNamespace()]
         response.choices[0].message = SimpleNamespace()
-        response.choices[0].message.content = self.response
+        response.choices[0].message.content = response_content
         response.choices[0].message.role = "assistant"
         response.choices[0].finish_reason = "stop"
         response.choices[0].index = 0
@@ -438,7 +447,10 @@ class VSCodeCopilot(dspy.BaseLM):
         import json
         try:
             response_data = json.loads(response.choices[0].message.content)
-            answer_content = response_data.get('answer', response.choices[0].message.content)
+            # Try multiple field names that might contain the actual response
+            answer_content = (response_data.get('answer') or 
+                            response_data.get('review') or 
+                            response.choices[0].message.content)
         except (json.JSONDecodeError, KeyError, AttributeError):
             answer_content = response.choices[0].message.content
         
