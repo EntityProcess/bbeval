@@ -226,3 +226,17 @@ Output file:
 - Default: `.bbeval/results/{testname}_{YYYYMMDD_HHMMSS}.jsonl` (or use `--out`)
 - Fields: `test_id`, `score`, `hits`, `misses`, `model_answer`, `expected_aspect_count`, `provider`, `model`, `timestamp`
 
+## Troubleshooting
+
+### Installation Issues
+
+**Problem**: `uv tool install bbeval` installs an older version despite a newer version being available on PyPI.
+
+**Solution**: Clear the uv cache and reinstall:
+```bash
+uv cache clean
+uv tool uninstall bbeval
+uv tool install bbeval
+```
+
+This forces uv to fetch fresh package metadata from PyPI instead of using potentially stale cached information.
