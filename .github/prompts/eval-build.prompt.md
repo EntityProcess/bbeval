@@ -19,6 +19,7 @@ description: 'Apply when writing evals in YAML format'
 ## Example
 ```yaml
 description: Evals for analyzing code patterns
+grader: heuristic
 
 testcases:
 - id: external-file-reference-system-context

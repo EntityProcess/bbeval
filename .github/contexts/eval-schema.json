@@ -8,6 +8,10 @@
       "type": "string",
       "description": "Description of what this test suite covers"
     },
+    "grader": {
+      "type": "string",
+      "description": "Grading method or strategy for evaluating test outcomes"
+    },
     "testcases": {
       "type": "array",
       "description": "Array of test cases",
@@ -26,6 +30,10 @@
           "note": {
             "type": "string",
             "description": "Optional note or additional context for the test case"
+          },
+          "validator": {
+            "type": "string",
+            "description": "Optional path to validator script for building/validating generated code"
           },
           "messages": {
             "type": "array",
