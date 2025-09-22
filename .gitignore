@@ -1,3 +1,7 @@
+## BbEval
+.bbeval/vscode-copilot/
+.bbeval/results/
+
 # Python
 __pycache__/
 *.py[cod]

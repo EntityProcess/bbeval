@@ -47,7 +47,7 @@ where = ["src"]
 include = ["bbeval*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["src/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -55,7 +55,7 @@ addopts = "-v --tb=short"
 
 [tool.coverage.run]
 source = ["bbeval"]
-omit = ["tests/*", "setup.py"]
+omit = ["src/tests/*", "setup.py"]
 
 [tool.coverage.report]
 exclude_lines = [

@@ -84,7 +84,7 @@ bbeval --tests "c:/path/to/test.yaml"
 python -m bbeval.cli --tests "c:/path/to/test.yaml"
 ```
 
-**Run a specific test case:**
+**Run a specific test case with custom targets path (VS Code Copilot):**
 ```powershell
 # Using the CLI command
 bbeval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case"
@@ -93,23 +93,7 @@ bbeval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/
 python -m bbeval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case"
 ```
 
-**Specify a target explicitly:**
-```powershell
-# Using the CLI command
-bbeval --target azure_base --tests "c:/path/to/test.yaml"
-
-# Or using the Python module
-python -m bbeval.cli --target azure_base --tests "c:/path/to/test.yaml"
-```
-
-**Run eval with custom targets file and test file:**
-```powershell
-# Using the CLI command
-bbeval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
-
-# Or using the Python module
-python -m bbeval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
-```
+We recommend *Grok Code Fast 1* or *Claude Sonnet 4* for VS Code Copilot, as these models are more consistent in following instruction chains.
 
 ### Command Line Options
 

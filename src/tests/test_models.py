@@ -75,9 +75,8 @@ class TestVSCodeCopilotHelpers(unittest.TestCase):
         self.assertEqual(reply_tmp.name, f"{test_case_id}.res.tmp.md")
         self.assertEqual(reply_final.name, f"{test_case_id}.res.md")
         
-        # Check that files are created in target repo's .bbeval/vscode-copilot directory
-        workspace_dir = Path(self.workspace_path).parent
-        expected_base_dir = workspace_dir / '.bbeval' / 'vscode-copilot'
+        # Check that files are created in the repo root's .bbeval/vscode-copilot directory
+        expected_base_dir = Path.cwd() / '.bbeval' / 'vscode-copilot'
         self.assertTrue(str(session_dir).startswith(str(expected_base_dir)))
     
     def test_prepare_session_files_default_id(self):
