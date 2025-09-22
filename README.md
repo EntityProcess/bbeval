@@ -4,20 +4,69 @@ Evaluates AI model answers against `.test.yaml` specs. Results are saved as JSON
 
 ## Installation and Setup
 
-### Development Installation
+### Installation for End Users
 
-```powershell
-# Install in development mode (creates proper package structure)
-pip install -e .
+This is the recommended method for users who want to use `speceval` as a command-line tool.
 
-# Or install with development dependencies
-pip install -e ".[dev]"
-```
+1.  **Ensure you have `uv` installed.** If you don't, you can install them via pip:
+    ```bash
+    pip install uv
+    ```
+
+2.  **Install `speceval`:**
+    ```bash
+    uv tool install speceval
+    ```
+
+    Alternatively, if you want the latest (unstable) version:
+    ```bash
+    uv tool install "git+https://github.com/EntityProcess/speceval.git"
+    ```
+
+3.  **Verify the installation:**
+    After installation, the `speceval` command will be available in your terminal. You can verify it by running:
+    ```bash
+    speceval --help
+    ```
+
+### Local Development Setup
+
+Follow these steps if you want to contribute to the `speceval` project itself. This workflow uses a virtual environment and an **editable install**, which means changes you make to the source code are immediately available without reinstalling.
+
+1.  **Clone the repository and navigate into it:**
+
+    ```bash
+    git clone https://github.com/entityprocess/speceval.git
+    cd speceval
+    ```
+
+2.  **Create and activate a virtual environment:**
+
+    ```bash
+    # Create the virtual environment
+    uv venv
+
+    # Activate it (macOS/Linux)
+    source .venv/bin/activate
+
+    # Activate it (Windows PowerShell)
+    .venv\Scripts\Activate.ps1
+    ```
+
+3.  **Perform an editable install with development dependencies:**
+    
+	This command installs `speceval` in editable (`-e`) mode and includes the extra tools needed for development and testing (`[dev]`).
+
+    ```bash
+    uv pip install -e ".[dev]"
+    ```
+
+You are now ready to start development. You can run the tool with `speceval`, edit the code in `src/`, and run tests with `pytest`.
 
 ### Environment Setup
 
 1. **Configure environment variables:**
-   - Copy [.env.example](/docs/examples/simple/.env.example) to `.env` in your project root
+   - Copy [.env.template](/docs/examples/simple/.env.template) to `.env` in your project root
    - Fill in your API keys, endpoints, and other configuration values
 
 2. **Set up targets:**
