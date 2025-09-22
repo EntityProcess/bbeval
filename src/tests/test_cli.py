@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit tests for speceval.cli module.
+Unit tests for bbeval.cli module.
 
 Tests the CLI helper functions for improved modularity.
 """
@@ -8,9 +8,9 @@ Tests the CLI helper functions for improved modularity.
 import unittest
 from unittest.mock import Mock, patch
 
-from speceval import EvaluationResult
-from speceval.models import AgentTimeoutError
-from speceval.cli import _run_test_case_with_retries
+from bbeval import EvaluationResult
+from bbeval.models import AgentTimeoutError
+from bbeval.cli import _run_test_case_with_retries
 
 
 class TestRunTestCaseWithRetries(unittest.TestCase):
@@ -25,10 +25,10 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         self.evaluation_module = Mock()
         self.evaluation_module.return_value = Mock(review="Mock review response")
         
-    @patch('speceval.cli.focus_vscode_workspace')
-    @patch('speceval.cli.build_prompt_inputs')
-    @patch('speceval.cli.evaluate_test_case')
-    @patch('speceval.cli.write_result_line')
+    @patch('bbeval.cli.focus_vscode_workspace')
+    @patch('bbeval.cli.build_prompt_inputs')
+    @patch('bbeval.cli.evaluate_test_case')
+    @patch('bbeval.cli.write_result_line')
     def test_successful_execution(self, mock_write, mock_evaluate, mock_build_prompt, mock_focus):
         """Test successful test case execution without retries."""
         # Setup mocks
@@ -66,9 +66,9 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         mock_evaluate.assert_called_once()
         mock_write.assert_not_called()  # No output file specified
     
-    @patch('speceval.cli.focus_vscode_workspace')
-    @patch('speceval.cli.build_prompt_inputs')
-    @patch('speceval.cli.evaluate_test_case')
+    @patch('bbeval.cli.focus_vscode_workspace')
+    @patch('bbeval.cli.build_prompt_inputs')
+    @patch('bbeval.cli.evaluate_test_case')
     def test_agent_timeout_with_retry(self, mock_evaluate, mock_build_prompt, mock_focus):
         """Test agent timeout handling with successful retry."""
         # Setup mocks - first call raises timeout, second succeeds
@@ -105,8 +105,8 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         self.assertEqual(result, mock_result)
         self.assertEqual(self.evaluation_module.call_count, 2)
     
-    @patch('speceval.cli.focus_vscode_workspace')
-    @patch('speceval.cli.build_prompt_inputs')
+    @patch('bbeval.cli.focus_vscode_workspace')
+    @patch('bbeval.cli.build_prompt_inputs')
     def test_max_retries_exceeded(self, mock_build_prompt, mock_focus):
         """Test handling when max retries are exceeded."""
         mock_build_prompt.return_value = {"prompt": "test prompt"}

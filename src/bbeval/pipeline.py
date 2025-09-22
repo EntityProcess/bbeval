@@ -1,5 +1,5 @@
 """
-Pipeline Module for SpecEval
+Pipeline Module for Bbeval
 
 Provides high-level pipeline functions for running evaluations
 and orchestrating the different components.

@@ -1,43 +1,43 @@
-# SpecEval
+# BbEval
 
-Evaluates AI model answers against `.test.yaml` specs. Results are saved as JSONL with deterministic scoring and a run summary.
+A lightweight black-box agent evaluator using YAML specifications to score task completion.
 
 ## Installation and Setup
 
 ### Installation for End Users
 
-This is the recommended method for users who want to use `speceval` as a command-line tool.
+This is the recommended method for users who want to use `bbeval` as a command-line tool.
 
 1.  **Ensure you have `uv` installed.** If you don't, you can install them via pip:
     ```bash
     pip install uv
     ```
 
-2.  **Install `speceval`:**
+2.  **Install `bbeval`:**
     ```bash
-    uv tool install speceval
+    uv tool install bbeval
     ```
 
     Alternatively, if you want the latest (unstable) version:
     ```bash
-    uv tool install "git+https://github.com/EntityProcess/speceval.git"
+    uv tool install "git+https://github.com/EntityProcess/bbeval.git"
     ```
 
 3.  **Verify the installation:**
-    After installation, the `speceval` command will be available in your terminal. You can verify it by running:
+    After installation, the `bbeval` command will be available in your terminal. You can verify it by running:
     ```bash
-    speceval --help
+    bbeval --help
     ```
 
 ### Local Development Setup
 
-Follow these steps if you want to contribute to the `speceval` project itself. This workflow uses a virtual environment and an **editable install**, which means changes you make to the source code are immediately available without reinstalling.
+Follow these steps if you want to contribute to the `bbeval` project itself. This workflow uses a virtual environment and an **editable install**, which means changes you make to the source code are immediately available without reinstalling.
 
 1.  **Clone the repository and navigate into it:**
 
     ```bash
-    git clone https://github.com/entityprocess/speceval.git
-    cd speceval
+    git clone https://github.com/entityprocess/bbeval.git
+    cd bbeval
     ```
 
 2.  **Create and activate a virtual environment:**
@@ -55,13 +55,13 @@ Follow these steps if you want to contribute to the `speceval` project itself. T
 
 3.  **Perform an editable install with development dependencies:**
     
-	This command installs `speceval` in editable (`-e`) mode and includes the extra tools needed for development and testing (`[dev]`).
+	This command installs `bbeval` in editable (`-e`) mode and includes the extra tools needed for development and testing (`[dev]`).
 
     ```bash
     uv pip install -e ".[dev]"
     ```
 
-You are now ready to start development. You can run the tool with `speceval`, edit the code in `src/`, and run tests with `pytest`.
+You are now ready to start development. You can run the tool with `bbeval`, edit the code in `src/`, and run tests with `pytest`.
 
 ### Environment Setup
 
@@ -70,7 +70,7 @@ You are now ready to start development. You can run the tool with `speceval`, ed
    - Fill in your API keys, endpoints, and other configuration values
 
 2. **Set up targets:**
-   - Copy [targets.yaml](/docs/examples/simple/.speceval/targets.yaml) to `.speceval/targets.yaml`
+   - Copy [targets.yaml](/docs/examples/simple/.bbeval/targets.yaml) to `.bbeval/targets.yaml`
    - Update the environment variable names in targets.yaml to match those defined in your `.env` file
 
 ## Quick start
@@ -78,43 +78,43 @@ You are now ready to start development. You can run the tool with `speceval`, ed
 **Run eval with default target (Azure):**
 ```powershell
 # Using the CLI command
-speceval --tests "c:/path/to/test.yaml"
+bbeval --tests "c:/path/to/test.yaml"
 
 # Or using the Python module
-python -m speceval.cli --tests "c:/path/to/test.yaml"
+python -m bbeval.cli --tests "c:/path/to/test.yaml"
 ```
 
 **Run a specific test case:**
 ```powershell
 # Using the CLI command
-speceval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case"
+bbeval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case"
 
 # Or using the Python module
-python -m speceval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case"
+python -m bbeval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case"
 ```
 
 **Specify a target explicitly:**
 ```powershell
 # Using the CLI command
-speceval --target azure_base --tests "c:/path/to/test.yaml"
+bbeval --target azure_base --tests "c:/path/to/test.yaml"
 
 # Or using the Python module
-python -m speceval.cli --target azure_base --tests "c:/path/to/test.yaml"
+python -m bbeval.cli --target azure_base --tests "c:/path/to/test.yaml"
 ```
 
 **Run eval with custom targets file and test file:**
 ```powershell
 # Using the CLI command
-speceval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
+bbeval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
 
 # Or using the Python module
-python -m speceval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
+python -m bbeval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
 ```
 
 ### Command Line Options
 
 - `--target TARGET`: Execution target name from targets.yaml (default: default)
-- `--targets TARGETS`: Path to targets.yaml file (default: ./.speceval/targets.yaml)
+- `--targets TARGETS`: Path to targets.yaml file (default: ./.bbeval/targets.yaml)
 - `--tests TESTS`: Path to test YAML file (required)
 - `--test-id TEST_ID`: Run only the test case with this specific ID
 - `--out OUTPUT_FILE`: Output JSONL file path (default: results/{testname}_{timestamp}.jsonl)
@@ -123,7 +123,7 @@ python -m speceval.cli --target vscode_projectx --targets "c:/path/to/targets.ya
 - `--max-retries COUNT`: Maximum number of retries for timeout cases (default: 2)
 - `--verbose`: Verbose output
 
-Output goes to `.speceval/results/{testname}_{timestamp}.jsonl` unless `--out` is provided.
+Output goes to `.bbeval/results/{testname}_{timestamp}.jsonl` unless `--out` is provided.
 
 ## Requirements
 
@@ -138,7 +138,7 @@ Environment keys (configured via targets.yaml):
 
 ## Targets and Environment Variables
 
-Execution targets in `.speceval/targets.yaml` decouple tests from providers/settings and provide flexible environment variable mapping.
+Execution targets in `.bbeval/targets.yaml` decouple tests from providers/settings and provide flexible environment variable mapping.
 
 ### Target Configuration Structure
 
@@ -187,7 +187,7 @@ When using VS Code or other AI agents that may experience timeouts, the evaluato
 
 Example with custom timeout settings:
 ```
-speceval --target vscode_projectx --tests evals/projectx/example.test.yaml --agent-timeout 180 --max-retries 3
+bbeval --target vscode_projectx --tests evals/projectx/example.test.yaml --agent-timeout 180 --max-retries 3
 ```
 
 ## How the evals work
@@ -203,13 +203,13 @@ For each testcase in a `.test.yaml` file:
 
 - Opens your configured workspace (`PROJECTX_WORKSPACE_PATH`) then runs: `code chat -r "{prompt}"`.
 - The prompt is built from the `.test.yaml` user content (task, files, code blocks); the expected assistant answer is never included.
-- Copilot is instructed to write its final answer to `.speceval/vscode-copilot/{test-case-id}.res.md`.
+- Copilot is instructed to write its final answer to `.bbeval/vscode-copilot/{test-case-id}.res.md`.
 
 ### Prompt file creation
 
 When using VS Code targets (or dry-run mode), the evaluator creates individual prompt files for each test case:
 
-- **Location**: `.speceval/vscode-copilot/`
+- **Location**: `.bbeval/vscode-copilot/`
 - **Naming**: `{test-case-id}.req.md`
 - **Format**: Contains instruction file references, reply path, and the question/task
 
@@ -223,6 +223,6 @@ Scoring:
 - Score = hits / total aspects; report `hits`, `misses`, `expected_aspect_count`
 
 Output file:
-- Default: `.speceval/results/{testname}_{YYYYMMDD_HHMMSS}.jsonl` (or use `--out`)
+- Default: `.bbeval/results/{testname}_{YYYYMMDD_HHMMSS}.jsonl` (or use `--out`)
 - Fields: `test_id`, `score`, `hits`, `misses`, `model_answer`, `expected_aspect_count`, `provider`, `model`, `timestamp`
 

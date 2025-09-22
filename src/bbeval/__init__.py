@@ -1,5 +1,5 @@
 """
-SpecEval Package
+Bbeval Package
 
 A lightweight, extensible evaluator for testing model-generated responses 
 against test specifications without leaking expected answers into prompts.

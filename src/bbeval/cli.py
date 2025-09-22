@@ -1,5 +1,5 @@
 """
-Command Line Interface for SpecEval
+Command Line Interface for Bbeval
 
 Provides CLI for running evaluations against test YAML files with
 support for multiple model providers and configuration via execution targets.
@@ -33,13 +33,13 @@ def load_targets(targets_file_path: str = None) -> List[Dict]:
     if targets_file_path:
         targets_file = Path(targets_file_path)
     else:
-        # Default to looking for .speceval/targets.yaml in the current working directory.
+        # Default to looking for .bbeval/targets.yaml in the current working directory.
         cwd = Path.cwd()
-        targets_file = cwd / ".speceval" / "targets.yaml"
+        targets_file = cwd / ".bbeval" / "targets.yaml"
     
     if not targets_file.exists():
         raise FileNotFoundError(
-            "Could not find '.speceval/targets.yaml' in the current directory. "
+            "Could not find '.bbeval/targets.yaml' in the current directory. "
             "Please specify the path using the --targets flag."
         )
     
@@ -72,13 +72,13 @@ def get_repo_root() -> Path:
 
 def get_default_output_path(test_file: str) -> str:
     """
-    Generate default output path in .speceval/results folder based on test file name.
+    Generate default output path in .bbeval/results folder based on test file name.
     
     Args:
         test_file: Path to the test YAML file
         
     Returns:
-        Default output file path in .speceval/results folder
+        Default output file path in .bbeval/results folder
     """
     # Get the base name of the test file without extension
     test_path = Path(test_file)
@@ -90,8 +90,8 @@ def get_default_output_path(test_file: str) -> str:
     # Create output filename
     output_filename = f"{base_name}_{timestamp}.jsonl"
     
-    # Return path relative to current working directory's .speceval/results folder
-    results_dir = Path.cwd() / ".speceval" / "results"
+    # Return path relative to current working directory's .bbeval/results folder
+    results_dir = Path.cwd() / ".bbeval" / "results"
     return str(results_dir / output_filename)
 
 def focus_vscode_workspace(provider: str, settings: Dict = None, verbose: bool = False) -> bool:
@@ -445,14 +445,14 @@ def main():
         else:
             print(f"No .env file found at: {env_file}")
     
-    parser = argparse.ArgumentParser(description="SpecEval")
+    parser = argparse.ArgumentParser(description="Bbeval")
     
     parser.add_argument('test_file',
                        help='Path to the .test.yaml file to run.')
     parser.add_argument('--target', default='default',
                        help='Execution target name from targets.yaml (default: default)')
     parser.add_argument('--targets', 
-                       help='Path to targets.yaml file (default: ./.speceval/targets.yaml)')
+                       help='Path to targets.yaml file (default: ./.bbeval/targets.yaml)')
     parser.add_argument('--test-id',
                        help='Run only the test case with this specific ID')
     parser.add_argument('--out', dest='output_file',

@@ -159,7 +159,7 @@ class VSCodeCopilot(dspy.BaseLM):
             Tuple of (session_dir, request_file_path, reply_tmp_path, reply_final_path)
         """
         # Create session-specific directory
-        output_dir = Path.cwd() / '.speceval' / 'vscode-copilot'
+        output_dir = Path.cwd() / '.bbeval' / 'vscode-copilot'
         session_dir = output_dir / self.session_id
         session_dir.mkdir(parents=True, exist_ok=True)
 
