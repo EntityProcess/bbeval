@@ -62,6 +62,55 @@ def find_target(target_name: str, targets: List[Dict]) -> Dict:
     available_targets = [t.get('name', 'unnamed') for t in targets]
     raise ValueError(f"Target '{target_name}' not found. Available targets: {', '.join(available_targets)}")
 
+def create_judge_model(target: Dict, targets: List[Dict], model: str, verbose: bool = False):
+    """
+    Create a judge model based on target configuration.
+    
+    Args:
+        target: The current execution target
+        targets: List of all available targets
+        model: The model name to use
+        verbose: Whether to print verbose output
+        
+    Returns:
+        Configured judge model instance
+    """
+    judge_target_name = target.get('judge_target')
+    
+    if judge_target_name:
+        # Use the specified judge target
+        if verbose:
+            print(f"  Using judge target: {judge_target_name}")
+        judge_target = find_target(judge_target_name, targets)
+        judge_provider = judge_target['provider']
+        judge_settings = judge_target.get('settings')
+        
+        # Get model from judge target settings or fall back to provided model
+        judge_model = judge_settings.get('model', model) if judge_settings else model
+        if isinstance(judge_model, str) and judge_model in os.environ:
+            judge_model = os.getenv(judge_model, model)
+    else:
+        # Fallback to hardcoded Azure for backward compatibility (when no judge_target specified)
+        if verbose:
+            print(f"  No judge_target specified, falling back to Azure")
+        judge_provider = "azure"
+        judge_settings = {
+            'endpoint': 'AZURE_OPEN_AI_ENDPOINT',
+            'api_key': 'AZURE_OPEN_AI_API_KEY'
+        }
+        judge_model = model
+        
+        # Check if Azure credentials are available for fallback
+        if not os.getenv('AZURE_OPEN_AI_ENDPOINT') or not os.getenv('AZURE_OPEN_AI_API_KEY'):
+            if verbose:
+                print(f"  Azure credentials not found, using mock judge")
+            judge_provider = "mock"
+            judge_settings = {}
+            judge_model = "mock-model"
+    
+    from .models import create_model
+    return create_model(judge_provider, judge_model, judge_settings)
+
 def get_repo_root() -> Path:
     """Find the repository root directory."""
     current = Path.cwd()
@@ -106,7 +155,9 @@ def _run_test_case_with_retries(
     output_file: str,
     dry_run: bool,
     verbose: bool,
-    max_retries: int
+    max_retries: int,
+    target: Dict,
+    targets: List[Dict]
 ) -> EvaluationResult:
     """
     Execute a single test case with retry logic and conditional judging.
@@ -122,6 +173,8 @@ def _run_test_case_with_retries(
         dry_run: Whether running in dry-run mode
         verbose: Whether to print verbose output
         max_retries: Maximum number of retries for timeout cases
+        target: Current execution target configuration
+        targets: List of all available targets
     
     Returns:
         EvaluationResult for the test case
@@ -155,25 +208,15 @@ def _run_test_case_with_retries(
                 # For VSCode provider, we need to temporarily switch to a standard model for judging
                 # to avoid double JSON wrapping and incorrect file naming
                 if provider.lower() == "vscode":
-                    print(f"  Detected VSCode provider, switching to Azure for judging...")
+                    print(f"  Detected VSCode provider, switching to judge model...")
                     # Save current model
                     original_lm = dspy.settings.lm
                     
-                    # Create a temporary Azure model for judging (fallback to default environment vars)
+                    # Create judge model based on target configuration
                     try:
-                        from .models import create_model
-                        azure_settings = {
-                            'endpoint': 'AZURE_OPEN_AI_ENDPOINT',
-                            'api_key': 'AZURE_OPEN_AI_API_KEY'
-                        }
-                        
-                        # Check if Azure credentials are available
-                        if not os.getenv('AZURE_OPEN_AI_ENDPOINT') or not os.getenv('AZURE_OPEN_AI_API_KEY'):
-                            raise ValueError("Azure credentials not found in environment")
-                        
-                        judge_model = create_model("azure", model, azure_settings)
+                        judge_model = create_judge_model(target, targets, model, verbose)
                         dspy.settings.configure(lm=judge_model)
-                        print(f"  Successfully switched to Azure model for LLM judging...")
+                        print(f"  Successfully switched to judge model for LLM judging...")
                         
                         llm_judge = dspy.Predict(CodeComparisonJudge)
                         judgement = llm_judge(
@@ -183,8 +226,9 @@ def _run_test_case_with_retries(
                             generated_code=candidate_response
                         )
                     except Exception as e:
-                        print(f"  Warning: Failed to create Azure judge model, falling back to mock: {e}")
-                        # Fallback to mock model if Azure isn't available
+                        print(f"  Warning: Failed to create judge model, falling back to mock: {e}")
+                        # Fallback to mock model if judge creation fails
+                        from .models import create_model
                         judge_model = create_model("mock", "mock-model")
                         dspy.settings.configure(lm=judge_model)
                         
@@ -302,7 +346,8 @@ def _run_test_case_with_retries(
 
 
 def run_evaluation(test_file: str, 
-                  target: Dict, 
+                  target: Dict,
+                  targets: List[Dict],
                   output_file: str = None,
                   dry_run: bool = False,
                   verbose: bool = False,
@@ -315,6 +360,7 @@ def run_evaluation(test_file: str,
     Args:
         test_file: Path to the test YAML file
         target: Target configuration from targets.yaml
+        targets: List of all available targets
         output_file: Optional output file for results
         dry_run: If True, use mock model
         test_id: Optional test ID to run only a specific test case
@@ -391,7 +437,9 @@ def run_evaluation(test_file: str,
             output_file=output_file,
             dry_run=dry_run,
             verbose=verbose,
-            max_retries=max_retries
+            max_retries=max_retries,
+            target=target,
+            targets=targets
         )
         results.append(result)
     
@@ -527,6 +575,7 @@ def main():
         results = run_evaluation(
             test_file=args.test_file,
             target=target,
+            targets=targets,
             output_file=args.output_file,
             dry_run=args.dry_run,
             verbose=args.verbose,

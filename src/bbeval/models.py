@@ -85,6 +85,9 @@ class MockModel(dspy.BaseLM):
         elif messages and any(judge_keyword in str(messages).lower() for judge_keyword in ['score', 'reasoning', 'judge', 'comparison']):
             # This looks like a judge request via messages, provide appropriate mock judge response
             response_content = '{"score": "0.85", "reasoning": "Mock judge evaluation: The code demonstrates good practices and follows most conventions. This is a test response from the mock judge model."}'
+        else:
+            # For regular signatures (CodeGeneration, CodeReview, KnowledgeQuery), use "answer" field
+            response_content = '{"answer": "Mock response: This is a test answer showing that the evaluator is working correctly. The implementation follows best practices and includes proper error handling."}'
         
         # Usage object that can be converted to dict
         class MockUsage:
@@ -116,6 +119,10 @@ class MockModel(dspy.BaseLM):
         response.model = "mock-model"
         
         return response
+    
+    def execute_prediction(self, predictor_module, **kwargs) -> dspy.Prediction:
+        """Executes a prediction using the standard dspy.Predict module."""
+        return predictor_module.predictor(**kwargs)
 
 class VSCodeCopilot(dspy.BaseLM):
     """VS Code Copilot model that shells out to VS Code with a prompt.

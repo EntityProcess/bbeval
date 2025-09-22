@@ -29,6 +29,14 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         self.evaluation_module = Mock()
         self.evaluation_module.return_value = Mock(answer="Mock review response")
         
+        # Mock target and targets
+        self.target = {
+            'name': 'test_target',
+            'provider': 'test',
+            'settings': {}
+        }
+        self.targets = [self.target]
+        
     @patch('bbeval.cli.determine_signature_from_test_case')
     @patch('bbeval.cli.build_prompt_inputs')
     @patch('bbeval.cli.evaluate_test_case')
@@ -63,7 +71,9 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
             output_file=None,
             dry_run=False,
             verbose=False,
-            max_retries=2
+            max_retries=2,
+            target=self.target,
+            targets=self.targets
         )
         
         self.assertEqual(result, mock_result)
@@ -106,7 +116,9 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
             output_file=None,
             dry_run=False,
             verbose=False,
-            max_retries=2
+            max_retries=2,
+            target=self.target,
+            targets=self.targets
         )
         
         self.assertEqual(result, mock_result)
@@ -128,7 +140,9 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
             output_file=None,
             dry_run=False,
             verbose=False,
-            max_retries=1
+            max_retries=1,
+            target=self.target,
+            targets=self.targets
         )
         
         self.assertEqual(result.test_id, "test_case_123")
@@ -163,7 +177,9 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
             output_file=None,
             dry_run=False,
             verbose=False,
-            max_retries=2
+            max_retries=2,
+            target=self.target,
+            targets=self.targets
         )
         
         # Verify LLM judge was used
