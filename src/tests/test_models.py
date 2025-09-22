@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 import tempfile
 import shutil
 import os
+from pathlib import Path
 
 from speceval.models import VSCodeCopilot, AgentTimeoutError
 
@@ -73,6 +74,11 @@ class TestVSCodeCopilotHelpers(unittest.TestCase):
         self.assertEqual(request_file.name, f"{test_case_id}.req.md")
         self.assertEqual(reply_tmp.name, f"{test_case_id}.res.tmp.md")
         self.assertEqual(reply_final.name, f"{test_case_id}.res.md")
+        
+        # Check that files are created in target repo's .speceval/vscode-copilot directory
+        workspace_dir = Path(self.workspace_path).parent
+        expected_base_dir = workspace_dir / '.speceval' / 'vscode-copilot'
+        self.assertTrue(str(session_dir).startswith(str(expected_base_dir)))
     
     def test_prepare_session_files_default_id(self):
         """Test session file preparation with default test case ID."""
