@@ -1,0 +1,27 @@
+# A list of all supported evaluation targets for the project.
+# Each target defines a provider and its specific configuration.
+# Actual values for paths/keys are stored in the local .env file.
+
+- name: vscode_projectx
+  provider: vscode
+  settings:
+    # VS Code provider requires a workspace context.
+    workspace_env_var: PROJECTX_WORKSPACE_PATH
+
+- name: azure_base
+  provider: azure
+  # The base LLM provider needs no extra settings, as the model is
+  # defined in the .env file.
+  settings:
+    endpoint: AZURE_OPEN_AI_ENDPOINT
+    api_key: AZURE_OPEN_AI_API_KEY
+    model: LLM_MODEL
+
+- name: default
+  provider: azure
+  # The base LLM provider needs no extra settings, as the model is
+  # defined in the .env file.
+  settings:
+    endpoint: AZURE_OPEN_AI_ENDPOINT
+    api_key: AZURE_OPEN_AI_API_KEY
+    model: LLM_MODEL

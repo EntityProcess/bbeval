@@ -1,6 +1,6 @@
 # SpecEval
 
-Evaluates LLM/Copilot answers against `.test.yaml` specs. Results are saved as JSONL with deterministic scoring and a run summary.
+Evaluates AI model answers against `.test.yaml` specs. Results are saved as JSONL with deterministic scoring and a run summary.
 
 ## Installation and Setup
 
@@ -16,7 +16,13 @@ pip install -e ".[dev]"
 
 ### Environment Setup
 
-Copy [.env.example](/docs/examples/simple/.env.example), rename to `.env` and set your variables.
+1. **Configure environment variables:**
+   - Copy [.env.example](/docs/examples/simple/.env.example) to `.env` in your project root
+   - Fill in your API keys, endpoints, and other configuration values
+
+2. **Set up targets:**
+   - Copy [targets.yaml](/docs/examples/simple/.speceval/targets.yaml) to `.speceval/targets.yaml`
+   - Update the environment variable names in targets.yaml to match those defined in your `.env` file
 
 ## Quick start
 
@@ -29,16 +35,16 @@ speceval --tests "c:/path/to/test.yaml"
 python -m speceval.cli --tests "c:/path/to/test.yaml"
 ```
 
-**Run a specific test case in dry-run mode:**
+**Run a specific test case:**
 ```powershell
 # Using the CLI command
-speceval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case" --dry-run
+speceval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case"
 
 # Or using the Python module
-python -m speceval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case" --dry-run
+python -m speceval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case"
 ```
 
-**Or specify a target explicitly:**
+**Specify a target explicitly:**
 ```powershell
 # Using the CLI command
 speceval --target azure_base --tests "c:/path/to/test.yaml"
@@ -56,15 +62,6 @@ speceval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c
 python -m speceval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
 ```
 
-**Run a specific test case by ID:**
-```
-# Using the CLI command
-speceval --tests ../../evals/development/powershell.test.yaml --test-id exit-vs-throw
-
-# Or using the Python module
-python -m speceval.cli --tests ../../evals/development/powershell.test.yaml --test-id exit-vs-throw
-```
-
 ### Command Line Options
 
 - `--target TARGET`: Execution target name from targets.yaml (default: default)
@@ -77,7 +74,7 @@ python -m speceval.cli --tests ../../evals/development/powershell.test.yaml --te
 - `--max-retries COUNT`: Maximum number of retries for timeout cases (default: 2)
 - `--verbose`: Verbose output
 
-Output goes to `results/{testname}_{timestamp}.jsonl` unless `--out` is provided.
+Output goes to `.speceval/results/{testname}_{timestamp}.jsonl` unless `--out` is provided.
 
 ## Requirements
 
@@ -132,7 +129,7 @@ Each target specifies:
 
 ## Timeout handling and retries
 
-When using VS Code Copilot or other agents that may experience timeouts, the evaluator includes automatic retry functionality:
+When using VS Code or other AI agents that may experience timeouts, the evaluator includes automatic retry functionality:
 
 - **Timeout detection**: Automatically detects when agents timeout (based on file creation status rather than response parsing)
 - **Automatic retries**: When a timeout occurs, the same test case is retried up to `--max-retries` times (default: 2)
