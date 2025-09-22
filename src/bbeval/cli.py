@@ -13,7 +13,8 @@ import yaml
 from pathlib import Path
 from typing import List, Dict
 import statistics
-from datetime import datetime
+from datetime import datetime, timezone
+import dspy
 
 # Import dotenv for later use
 try:
@@ -25,7 +26,7 @@ except ImportError:
 from . import EvaluationResult
 from .yaml_parser import load_testcases, build_prompt_inputs
 from .models import configure_dspy_model, AgentTimeoutError
-from .signatures import EvaluationModule, determine_signature_from_test_case
+from .signatures import EvaluationModule, determine_signature_from_test_case, CodeGeneration, CodeComparisonJudge
 from .scoring import evaluate_test_case
 
 def load_targets(targets_file_path: str = None) -> List[Dict]:
@@ -61,6 +62,55 @@ def find_target(target_name: str, targets: List[Dict]) -> Dict:
     available_targets = [t.get('name', 'unnamed') for t in targets]
     raise ValueError(f"Target '{target_name}' not found. Available targets: {', '.join(available_targets)}")
 
+def create_judge_model(target: Dict, targets: List[Dict], model: str, verbose: bool = False):
+    """
+    Create a judge model based on target configuration.
+    
+    Args:
+        target: The current execution target
+        targets: List of all available targets
+        model: The model name to use
+        verbose: Whether to print verbose output
+        
+    Returns:
+        Configured judge model instance
+    """
+    judge_target_name = target.get('judge_target')
+    
+    if judge_target_name:
+        # Use the specified judge target
+        if verbose:
+            print(f"  Using judge target: {judge_target_name}")
+        judge_target = find_target(judge_target_name, targets)
+        judge_provider = judge_target['provider']
+        judge_settings = judge_target.get('settings')
+        
+        # Get model from judge target settings or fall back to provided model
+        judge_model = judge_settings.get('model', model) if judge_settings else model
+        if isinstance(judge_model, str) and judge_model in os.environ:
+            judge_model = os.getenv(judge_model, model)
+    else:
+        # Fallback to hardcoded Azure for backward compatibility (when no judge_target specified)
+        if verbose:
+            print(f"  No judge_target specified, falling back to Azure")
+        judge_provider = "azure"
+        judge_settings = {
+            'endpoint': 'AZURE_OPEN_AI_ENDPOINT',
+            'api_key': 'AZURE_OPEN_AI_API_KEY'
+        }
+        judge_model = model
+        
+        # Check if Azure credentials are available for fallback
+        if not os.getenv('AZURE_OPEN_AI_ENDPOINT') or not os.getenv('AZURE_OPEN_AI_API_KEY'):
+            if verbose:
+                print(f"  Azure credentials not found, using mock judge")
+            judge_provider = "mock"
+            judge_settings = {}
+            judge_model = "mock-model"
+    
+    from .models import create_model
+    return create_model(judge_provider, judge_model, judge_settings)
+
 def get_repo_root() -> Path:
     """Find the repository root directory."""
     current = Path.cwd()
@@ -94,49 +144,6 @@ def get_default_output_path(test_file: str) -> str:
     results_dir = Path.cwd() / ".bbeval" / "results"
     return str(results_dir / output_filename)
 
-def focus_vscode_workspace(provider: str, settings: Dict = None, verbose: bool = False) -> bool:
-    """
-    Focus the VS Code workspace before running a test.
-    
-    Args:
-        provider: The provider name (must be 'vscode')
-        settings: Target settings containing workspace configuration
-        verbose: Whether to print verbose output
-        
-    Returns:
-        True if focus was attempted, False otherwise
-    """
-    if provider.lower() != 'vscode':
-        return False
-        
-    workspace_env_var = settings.get('workspace_env_var') if settings else None
-    if not workspace_env_var:
-        return False
-        
-    workspace_path = os.getenv(workspace_env_var)
-    if not workspace_path:
-        if verbose:
-            print(f"  Warning: Environment variable '{workspace_env_var}' is not set")
-        return False
-    
-    try:
-        # Import the workspace opener from the same package
-        from .open_vscode_workspace import open_and_focus_workspace
-        
-        success = open_and_focus_workspace(workspace_path, focus=True)
-        if success:
-            if verbose:
-                print("  VS Code workspace focused successfully")
-            return True
-        else:
-            if verbose:
-                print("  Warning: Failed to focus workspace")
-    except Exception as e:
-        if verbose:
-            print(f"  Warning: Failed to focus VS Code workspace: {e}")
-    
-    return False
-
 
 def _run_test_case_with_retries(
     test_case,
@@ -148,10 +155,12 @@ def _run_test_case_with_retries(
     output_file: str,
     dry_run: bool,
     verbose: bool,
-    max_retries: int
+    max_retries: int,
+    target: Dict,
+    targets: List[Dict]
 ) -> EvaluationResult:
     """
-    Execute a single test case with retry logic for timeout handling.
+    Execute a single test case with retry logic and conditional judging.
     
     Args:
         test_case: The test case to execute
@@ -164,6 +173,8 @@ def _run_test_case_with_retries(
         dry_run: Whether running in dry-run mode
         verbose: Whether to print verbose output
         max_retries: Maximum number of retries for timeout cases
+        target: Current execution target configuration
+        targets: List of all available targets
     
     Returns:
         EvaluationResult for the test case
@@ -174,10 +185,6 @@ def _run_test_case_with_retries(
     while retry_count < max_attempts:
         if retry_count > 0:
             print(f"  Retry attempt {retry_count}/{max_retries} for test case: {test_case.id}")
-        
-        # Focus VS Code workspace once per attempt (including retries)
-        if not dry_run:
-            focus_vscode_workspace(provider, settings, verbose)
 
         try:
             # Build prompt inputs (without leaking expected response)
@@ -191,10 +198,76 @@ def _run_test_case_with_retries(
             prediction = evaluation_module(test_case_id=test_case.id, **prompt_inputs)
             candidate_response = prediction.answer
             
-            # Evaluate the response
-            print(f"  Evaluating response...")
-            result = evaluate_test_case(test_case, candidate_response, provider, model)
-            
+            # Determine which signature class was used to decide evaluation method
+            signature_class = determine_signature_from_test_case(test_case)
+
+            if signature_class is CodeGeneration:
+                # Use LLM judge for code generation tasks
+                print("  Using LLM Judge for direct code comparison...")
+                
+                # For VSCode provider, we need to temporarily switch to a standard model for judging
+                # to avoid double JSON wrapping and incorrect file naming
+                if provider.lower() == "vscode":
+                    print(f"  Detected VSCode provider, switching to judge model...")
+                    # Save current model
+                    original_lm = dspy.settings.lm
+                    
+                    # Create judge model based on target configuration
+                    try:
+                        judge_model = create_judge_model(target, targets, model, verbose)
+                        dspy.settings.configure(lm=judge_model)
+                        print(f"  Successfully switched to judge model for LLM judging...")
+                        
+                        llm_judge = dspy.Predict(CodeComparisonJudge)
+                        judgement = llm_judge(
+                            outcome=test_case.outcome,
+                            task_requirements=test_case.task,
+                            reference_code=test_case.expected_assistant_raw,
+                            generated_code=candidate_response
+                        )
+                    except Exception as e:
+                        print(f"  Warning: Failed to create judge model, falling back to mock: {e}")
+                        # Fallback to mock model if judge creation fails
+                        from .models import create_model
+                        judge_model = create_model("mock", "mock-model")
+                        dspy.settings.configure(lm=judge_model)
+                        
+                        llm_judge = dspy.Predict(CodeComparisonJudge)
+                        judgement = llm_judge(
+                            outcome=test_case.outcome,
+                            task_requirements=test_case.task,
+                            reference_code=test_case.expected_assistant_raw,
+                            generated_code=candidate_response
+                        )
+                    finally:
+                        # Restore original model
+                        print(f"  Restoring original VSCode model...")
+                        dspy.settings.configure(lm=original_lm)
+                else:
+                    llm_judge = dspy.Predict(CodeComparisonJudge)
+                    judgement = llm_judge(
+                        outcome=test_case.outcome,
+                        task_requirements=test_case.task,
+                        reference_code=test_case.expected_assistant_raw,
+                        generated_code=candidate_response
+                    )
+                
+                result = EvaluationResult(
+                    test_id=test_case.id,
+                    score=float(judgement.score),
+                    hits=[judgement.reasoning],
+                    misses=[],
+                    model_answer=candidate_response,
+                    expected_aspect_count=1,
+                    provider=provider,
+                    model=model,
+                    timestamp=datetime.now(timezone.utc).isoformat()
+                )
+            else:
+                # Use heuristic scorer for other test types
+                print(f"  Evaluating response with heuristic scorer...")
+                result = evaluate_test_case(test_case, candidate_response, provider, model)
+
             print(f"  Score: {result.score:.2f} ({result.hit_count}/{result.expected_aspect_count} aspects)")
             
             # Write result immediately if output file specified
@@ -250,6 +323,7 @@ def _run_test_case_with_retries(
             if verbose:
                 import traceback
                 traceback.print_exc()
+            
             # Create error result
             error_result = EvaluationResult(
                 test_id=test_case.id,
@@ -272,7 +346,8 @@ def _run_test_case_with_retries(
 
 
 def run_evaluation(test_file: str, 
-                  target: Dict, 
+                  target: Dict,
+                  targets: List[Dict],
                   output_file: str = None,
                   dry_run: bool = False,
                   verbose: bool = False,
@@ -285,6 +360,7 @@ def run_evaluation(test_file: str,
     Args:
         test_file: Path to the test YAML file
         target: Target configuration from targets.yaml
+        targets: List of all available targets
         output_file: Optional output file for results
         dry_run: If True, use mock model
         test_id: Optional test ID to run only a specific test case
@@ -361,7 +437,9 @@ def run_evaluation(test_file: str,
             output_file=output_file,
             dry_run=dry_run,
             verbose=verbose,
-            max_retries=max_retries
+            max_retries=max_retries,
+            target=target,
+            targets=targets
         )
         results.append(result)
     
@@ -497,6 +575,7 @@ def main():
         results = run_evaluation(
             test_file=args.test_file,
             target=target,
+            targets=targets,
             output_file=args.output_file,
             dry_run=args.dry_run,
             verbose=args.verbose,

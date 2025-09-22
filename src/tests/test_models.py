@@ -28,6 +28,7 @@ class TestVSCodeCopilotHelpers(unittest.TestCase):
         
         self.vscode_copilot = VSCodeCopilot(
             workspace_path=self.workspace_path,
+            workspace_env_var="TEST_WORKSPACE",
             polling_timeout=10
         )
     
