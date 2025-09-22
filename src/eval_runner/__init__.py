@@ -1,5 +1,5 @@
 """
-DSPy Agent Evaluator Package
+SpecEval Package
 
 A lightweight, extensible evaluator for testing model-generated responses 
 against test specifications without leaking expected answers into prompts.

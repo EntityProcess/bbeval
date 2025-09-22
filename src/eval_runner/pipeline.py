@@ -1,5 +1,5 @@
 """
-Pipeline Module for DSPy Agent Evaluator
+Pipeline Module for SpecEval
 
 Provides high-level pipeline functions for running evaluations
 and orchestrating the different components.

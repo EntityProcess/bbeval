@@ -440,33 +440,50 @@ def create_model(provider: str, model: str, settings: Dict[str, Any] = None, **k
     settings = settings or {}
     
     if provider == "vscode":
-        # VS Code provider needs workspace path from environment variable
+        # Get environment variable name from target settings
         workspace_env_var = settings.get('workspace_env_var')
         if not workspace_env_var:
-            raise ValueError("VS Code provider requires 'workspace_env_var' in settings")
+            raise ValueError("VS Code 'settings' in targets.yaml must define 'workspace_env_var'")
         
+        # Fetch value from the environment using the name specified in the YAML
         workspace_path = os.getenv(workspace_env_var)
         if not workspace_path:
-            raise ValueError(f"Environment variable '{workspace_env_var}' is required by target but is not set")
+            raise ValueError(f"Environment variable '{workspace_env_var}' is not set.")
         
         # Extract polling timeout from kwargs, default to 120 seconds
         polling_timeout = kwargs.pop('polling_timeout', 120)
         return VSCodeCopilot(workspace_path=workspace_path, polling_timeout=polling_timeout, **kwargs)
     elif provider == "anthropic":
-        # Use dspy.LM with anthropic provider
-        api_key = kwargs.get('api_key') or os.getenv("ANTHROPIC_API_KEY")
+        # Get environment variable names from target settings
+        api_key_var = settings.get('api_key')
+        
+        if not api_key_var:
+            raise ValueError("Anthropic 'settings' in targets.yaml must define 'api_key'")
+        
+        # Fetch values from the environment using the names specified in the YAML
+        api_key = kwargs.get('api_key') or os.getenv(api_key_var)
+        
         if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY environment variable or api_key parameter is required")
+            raise ValueError(f"Environment variable '{api_key_var}' is not set.")
+        
         lm = dspy.LM(f"anthropic/{model}", api_key=api_key)
         return StandardLM(lm)
     elif provider == "azure":
-        # Use dspy.LM with azure provider
-        endpoint = kwargs.get('endpoint') or os.getenv("AZURE_OPEN_AI_ENDPOINT")
-        api_key = kwargs.get('api_key') or os.getenv("AZURE_OPEN_AI_API_KEY")
+        # Get environment variable names from target settings
+        endpoint_var = settings.get('endpoint')
+        api_key_var = settings.get('api_key')
+
+        if not endpoint_var or not api_key_var:
+            raise ValueError("Azure 'settings' in targets.yaml must define 'endpoint' and 'api_key'")
+
+        # Fetch values from the environment using the names specified in the YAML
+        endpoint = kwargs.get('endpoint') or os.getenv(endpoint_var)
+        api_key = kwargs.get('api_key') or os.getenv(api_key_var)
+
         if not endpoint:
-            raise ValueError("AZURE_OPEN_AI_ENDPOINT environment variable or endpoint parameter is required")
+            raise ValueError(f"Environment variable '{endpoint_var}' is not set.")
         if not api_key:
-            raise ValueError("AZURE_OPEN_AI_API_KEY environment variable or api_key parameter is required")
+            raise ValueError(f"Environment variable '{api_key_var}' is not set.")
         # Handle reasoning models special requirements (GPT-5, o1, o3, etc.)
         reasoning_models = ["gpt-5", "o1", "o3"]
         is_reasoning_model = any(reasoning_model in model.lower() for reasoning_model in reasoning_models)

@@ -1,5 +1,5 @@
 """
-Command Line Interface for DSPy Agent Evaluator
+Command Line Interface for SpecEval
 
 Provides CLI for running evaluations against test YAML files with
 support for multiple model providers and configuration via execution targets.
@@ -15,12 +15,12 @@ from typing import List, Dict
 import statistics
 from datetime import datetime
 
-# Load environment variables from .env file if present
+# Import dotenv for later use
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    DOTENV_AVAILABLE = True
 except ImportError:
-    pass  # python-dotenv is optional
+    DOTENV_AVAILABLE = False
 
 from . import EvaluationResult
 from .yaml_parser import load_testcases, build_prompt_inputs
@@ -28,13 +28,20 @@ from .models import configure_dspy_model, AgentTimeoutError
 from .signatures import EvaluationModule, determine_signature_from_test_case
 from .scoring import evaluate_test_case
 
-def load_targets() -> List[Dict]:
-    """Load execution targets from targets.yaml file."""
-    repo_root = get_repo_root()
-    targets_file = repo_root / "evals" / "targets.yaml"
+def load_targets(targets_file_path: str = None) -> List[Dict]:
+    """Load execution targets from a YAML file."""
+    if targets_file_path:
+        targets_file = Path(targets_file_path)
+    else:
+        # Default to looking for .speceval/targets.yaml in the current working directory.
+        cwd = Path.cwd()
+        targets_file = cwd / ".speceval" / "targets.yaml"
     
     if not targets_file.exists():
-        raise FileNotFoundError(f"targets.yaml file not found at: {targets_file}")
+        raise FileNotFoundError(
+            "Could not find '.speceval/targets.yaml' in the current directory. "
+            "Please specify the path using the --targets flag."
+        )
     
     with open(targets_file, 'r', encoding='utf-8') as f:
         targets = yaml.safe_load(f)
@@ -428,12 +435,24 @@ def print_summary(results: List[EvaluationResult]):
 
 def main():
     """Main CLI entry point."""
-    parser = argparse.ArgumentParser(description="DSPy Agent Evaluator")
+    # Load environment variables from .env file in current working directory
+    if DOTENV_AVAILABLE:
+        # Explicitly load .env from current working directory
+        env_file = Path.cwd() / ".env"
+        if env_file.exists():
+            load_dotenv(env_file)
+            print(f"Loaded .env file from: {env_file}")
+        else:
+            print(f"No .env file found at: {env_file}")
     
+    parser = argparse.ArgumentParser(description="SpecEval")
+    
+    parser.add_argument('test_file',
+                       help='Path to the .test.yaml file to run.')
     parser.add_argument('--target', default='default',
                        help='Execution target name from targets.yaml (default: default)')
-    parser.add_argument('--tests', required=True,
-                       help='Path to test YAML file')
+    parser.add_argument('--targets', 
+                       help='Path to targets.yaml file (default: ./.speceval/targets.yaml)')
     parser.add_argument('--test-id',
                        help='Run only the test case with this specific ID')
     parser.add_argument('--out', dest='output_file',
@@ -451,13 +470,13 @@ def main():
     args = parser.parse_args()
     
     # Validate test file exists
-    if not Path(args.tests).exists():
-        print(f"Error: Test file not found: {args.tests}")
+    if not Path(args.test_file).exists():
+        print(f"Error: Test file not found: {args.test_file}")
         sys.exit(1)
     
     # Load and find target configuration
     try:
-        targets = load_targets()
+        targets = load_targets(args.targets)
         target = find_target(args.target, targets)
         print(f"Using target: {target['name']} (provider: {target['provider']})")
     except (FileNotFoundError, ValueError) as e:
@@ -466,7 +485,7 @@ def main():
     
     # Set default output file if not specified
     if not args.output_file:
-        args.output_file = get_default_output_path(args.tests)
+        args.output_file = get_default_output_path(args.test_file)
         print(f"No output file specified, defaulting to: {args.output_file}")
     
     # Create output directory if specified
@@ -480,7 +499,7 @@ def main():
     try:
         # Run evaluation
         results = run_evaluation(
-            test_file=args.tests,
+            test_file=args.test_file,
             target=target,
             output_file=args.output_file,
             dry_run=args.dry_run,

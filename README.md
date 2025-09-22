@@ -1,14 +1,10 @@
-# DSPy Agent Evaluator
+# SpecEval
 
-Action-based guide to run evals and understand how they work.
-
-Evaluate LLM/Copilot answers against `.test.yaml` specs in `evals/**` with zero leakage of expected answers. Results are saved as JSONL with deterministic scoring and a run summary.
+Evaluates LLM/Copilot answers against `.test.yaml` specs. Results are saved as JSONL with deterministic scoring and a run summary.
 
 ## Installation and Setup
 
 ### Development Installation (Recommended)
-
-Open terminal in `scripts/agent-eval` and install in editable mode:
 
 ```powershell
 # Install in development mode (creates proper package structure)
@@ -34,22 +30,59 @@ pytest --cov=eval_runner
 
 ## Quick start (Windows PowerShell)
 
-Run eval with default target (Azure):
+Run eval with custom targets file and test file:
+```powershell
+# Using the CLI command
+speceval --target vscode_cargowise --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
+
+# Or using the Python module
+python -m eval_runner.cli --target vscode_cargowise --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml"
 ```
+
+Run eval with default target (Azure):
+```powershell
+# Using the CLI command
+speceval --tests ../../evals/development/powershell.test.yaml
+
+# Or using the Python module
 python -m eval_runner.cli --tests ../../evals/development/powershell.test.yaml
 ```
 
-Or specify a target explicitly:
+Run a specific test case in dry-run mode:
+```powershell
+# Using the CLI command
+speceval --target vscode_cargowise --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case" --dry-run
+
+# Or using the Python module
+python -m eval_runner.cli --target vscode_cargowise --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case" --dry-run
 ```
+
+Or specify a target explicitly:
+```powershell
+# Using the CLI command
+speceval --target azure_base --tests ../../evals/development/powershell.test.yaml
+
+# Or using the Python module
 python -m eval_runner.cli --target azure_base --tests ../../evals/development/powershell.test.yaml
 ```
 
-Or run via VS Code Copilot:
-```
-python -m eval_runner.cli --target vscode_cargowise --tests ../../evals/cargowise/base.test.yaml
-```
+### Command Line Options
+
+- `--target TARGET`: Execution target name from targets.yaml (default: default)
+- `--targets TARGETS`: Path to targets.yaml file (default: ./.speceval/targets.yaml)
+- `--tests TESTS`: Path to test YAML file (required)
+- `--test-id TEST_ID`: Run only the test case with this specific ID
+- `--out OUTPUT_FILE`: Output JSONL file path (default: results/{testname}_{timestamp}.jsonl)
+- `--dry-run`: Run with mock model for testing
+- `--agent-timeout SECONDS`: Timeout in seconds for agent response polling (default: 120)
+- `--max-retries COUNT`: Maximum number of retries for timeout cases (default: 2)
+- `--verbose`: Verbose output
 Run a specific test case by ID:
 ```
+# Using the CLI command
+speceval --tests ../../evals/development/powershell.test.yaml --test-id exit-vs-throw
+
+# Or using the Python module
 python -m eval_runner.cli --tests ../../evals/development/powershell.test.yaml --test-id exit-vs-throw
 ```
 
@@ -61,46 +94,97 @@ Output goes to `results/{testname}_{timestamp}.jsonl` unless `--out` is provided
 - Evaluator location: `scripts/agent-eval/`
 - `.env` for credentials/targets (recommended)
 
-Environment keys:
-- Provider: `PROVIDER=azure | anthropic` (CLI `--provider` overrides)
-- Azure: `AZURE_OPEN_AI_ENDPOINT`, `AZURE_OPEN_AI_API_KEY`, `LLM_MODEL`
-- Anthropic: `ANTHROPIC_API_KEY`, `LLM_MODEL` (or pass `--model`)
-- VS Code: `EVAL_CARGOWISE_WORKSPACE_PATH` → `.code-workspace` path
+Environment keys (configured via targets.yaml):
+- Azure: Set environment variables specified in your target's `settings.endpoint`, `settings.api_key`, and `settings.model`
+- Anthropic: Set environment variables specified in your target's `settings.api_key` and `settings.model`
+- VS Code: Set environment variable specified in your target's `settings.workspace_env_var` → `.code-workspace` path
 
-## Targets
+Default variable names (when using provided targets.yaml):
+- `AZURE_OPEN_AI_ENDPOINT`, `AZURE_OPEN_AI_API_KEY`, `LLM_MODEL`
+- `ANTHROPIC_API_KEY`, `LLM_MODEL`
+- `EVAL_CARGOWISE_WORKSPACE_PATH`
 
-Execution targets in `evals/targets.yaml` decouple tests from providers/settings.
-- `azure_base` → Azure OpenAI / Azure AI Foundry
-- `vscode_cargowise` → VS Code Copilot via a workspace
+## Targets and Environment Variables
 
-Provider precedence: CLI `--provider` > `PROVIDER` env > default `azure`.
+Execution targets in `.speceval/targets.yaml` decouple tests from providers/settings and provide flexible environment variable mapping.
+
+### Target Configuration Structure
+
+Each target specifies:
+- `name`: Unique identifier for the target
+- `provider`: The model provider (`azure`, `anthropic`, `vscode`, or `mock`)
+- `settings`: Environment variable names to use for this target
+
+### Examples
+
+**Azure targets:**
+```yaml
+- name: azure_base
+  provider: azure
+  settings:
+    endpoint: "AZURE_OPEN_AI_ENDPOINT"
+    api_key: "AZURE_OPEN_AI_API_KEY"
+    model: "LLM_MODEL"
+```
+
+**Anthropic targets:**
+```yaml
+- name: anthropic_base
+  provider: anthropic
+  settings:
+    api_key: "ANTHROPIC_API_KEY"
+    model: "LLM_MODEL"
+```
+
+**VS Code targets:**
+```yaml
+- name: vscode_projectx
+  provider: vscode
+  settings:
+    workspace_env_var: "EVAL_PROJECTX_WORKSPACE_PATH"
+```
+
+### Environment Variable Mapping
+
+The `settings` section maps configuration keys to your environment variable names. This allows you to:
+- Use existing environment variables without renaming them
+- Support multiple configurations (dev, staging, prod) with different variable names
+- Keep credentials separate from code
+
+Set your environment variables to match what you've defined in `targets.yaml`:
+```bash
+# For azure_base target
+export AZURE_OPEN_AI_ENDPOINT="https://your-endpoint.openai.azure.com/"
+export AZURE_OPEN_AI_API_KEY="your-api-key"
+export LLM_MODEL="gpt-4"
+
+# For azure_custom target  
+export CUSTOM_AZURE_ENDPOINT="https://staging-endpoint.openai.azure.com/"
+export CUSTOM_AZURE_KEY="staging-api-key"
+export CUSTOM_MODEL="gpt-4-staging"
+```
 
 ## Run examples (Windows PowerShell)
 
-- Default target (uses azure provider):
-  python -m eval_runner.cli `
-    --tests ../../evals/development/powershell.test.yaml
+**Default target (uses azure provider):**
+```
+speceval --tests evals/example.test.yaml
+```
 
-- Azure (base LLM):
-  python -m eval_runner.cli `
-    --target azure_base `
-    --tests ../../evals/development/powershell.test.yaml
+**Azure (base LLM):**
+```
+speceval --target azure_base --tests evals/example.test.yaml
+```
 
-- VS Code (Copilot):
-  python -m eval_runner.cli `
-    --target vscode_cargowise `
-    --tests ../../evals/cargowise/base.test.yaml
+**VS Code (Copilot):**
+```
+speceval --target vscode_projectx --tests evals/example.test.yaml
+```
 
-- Dry run (no external calls):
-  python -m eval_runner.cli `
-    --target azure_base `
-    --tests ../../evals/development/powershell.test.yaml `
-    --dry-run
-
-- Run specific test case by ID:
-  python -m eval_runner.cli `
-    --tests ../../evals/development/powershell.test.yaml `
-    --test-id exit-vs-throw
+**Run specific test case by ID:**
+```
+speceval --tests evals/example.test.yaml --test-id example-test-case-1
+```
 
 Common flags:
 - `--target <name>` execution target (default: default)
@@ -121,7 +205,7 @@ When using VS Code Copilot or other agents that may experience timeouts, the eva
 
 Example with custom timeout settings:
 ```
-python -m eval_runner.cli --target vscode_cargowise --tests ../../evals/cargowise/base.test.yaml --agent-timeout 180 --max-retries 3
+speceval --target vscode_projectx --tests evals/cargowise/base.test.yaml --agent-timeout 180 --max-retries 3
 ```
 
 ## How the evals work
@@ -158,7 +242,7 @@ code chat -r "Run command Get-Content -Raw -LiteralPath C:\git\GitHub\WiseTechGl
 ```
 
 **Workflow:**
-1. Run evaluator: `python -m eval_runner.cli --target vscode_cargowise --tests ../../evals/development/powershell.test.yaml`
+1. Run evaluator: `speceval --target vscode_cargowise --tests ../../evals/development/powershell.test.yaml`
 2. Find prompt files in `.vscode-copilot/` directory (e.g., `comprehensive-review-issues.req.md`)
 3. Manually run specific prompts as needed using PowerShell + VS Code chat
 

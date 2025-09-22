@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quick diagnostic script to verify the DSPy Agent Evaluator works
+Quick diagnostic script to verify the SpecEval works
 without external dependencies.
 """
 
