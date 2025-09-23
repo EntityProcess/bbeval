@@ -98,15 +98,7 @@ class EvaluationPipeline:
                     candidate_response = prediction.review
                     
                     # Evaluate response based on configured grader
-                    if test_case.grader == 'llm_judge':
-                        print("  Using LLM Judge for grading...")
-                        result = grade_test_case_llm_judge(
-                            test_case, 
-                            candidate_response, 
-                            self.provider, 
-                            self.model
-                        )
-                    else:  # Default to heuristic grader
+                    if test_case.grader == 'heuristic':
                         print("  Using heuristic grader...")
                         result = grade_test_case_heuristic(
                             test_case, 
@@ -114,6 +106,32 @@ class EvaluationPipeline:
                             self.provider, 
                             self.model
                         )
+                    else:  # Default to LLM judge with fallback to heuristic
+                        print("  Using LLM Judge for grading...")
+                        try:
+                            result = grade_test_case_llm_judge(
+                                test_case, 
+                                candidate_response, 
+                                self.provider, 
+                                self.model
+                            )
+                            # Check if LLM judge actually failed (indicated by specific error message)
+                            if result.misses and any("LLM judge failed" in miss for miss in result.misses):
+                                print("  LLM Judge failed, falling back to heuristic grader...")
+                                result = grade_test_case_heuristic(
+                                    test_case, 
+                                    candidate_response, 
+                                    self.provider, 
+                                    self.model
+                                )
+                        except Exception as e:
+                            print(f"  LLM Judge failed ({str(e)}), falling back to heuristic grader...")
+                            result = grade_test_case_heuristic(
+                                test_case, 
+                                candidate_response, 
+                                self.provider, 
+                                self.model
+                            )
                     
                     results.append(result)
                     test_completed = True
