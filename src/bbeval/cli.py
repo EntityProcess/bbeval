@@ -197,10 +197,6 @@ def _run_test_case_grading(
             
             # Run the model prediction with conditional caching
             print(f"  Running prediction...")
-            if not use_cache:
-                print("    (Cache is disabled)")
-            else:
-                print("    (Cache is enabled)")
             prediction = evaluation_module(test_case_id=test_case.id, **prompt_inputs)
             candidate_response = prediction.answer
             
