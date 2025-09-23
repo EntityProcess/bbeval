@@ -483,6 +483,9 @@ def create_model(provider: str, model: str, settings: Dict[str, Any] = None, **k
     provider = provider.lower()
     settings = settings or {}
     
+    # Extract optional cache control
+    disable_cache: bool = bool(kwargs.pop('disable_cache', False))
+
     if provider == "vscode":
         # Get environment variable name from target settings
         workspace_env_var = settings.get('workspace_env_var')
@@ -510,7 +513,10 @@ def create_model(provider: str, model: str, settings: Dict[str, Any] = None, **k
         if not api_key:
             raise ValueError(f"Environment variable '{api_key_var}' is not set.")
         
-        lm = dspy.LM(f"anthropic/{model}", api_key=api_key)
+        if disable_cache:
+            lm = dspy.LM(f"anthropic/{model}", api_key=api_key, cache=False)
+        else:
+            lm = dspy.LM(f"anthropic/{model}", api_key=api_key)
         return StandardLM(lm)
     elif provider == "azure":
         # Get environment variable names from target settings
@@ -533,9 +539,15 @@ def create_model(provider: str, model: str, settings: Dict[str, Any] = None, **k
         is_reasoning_model = any(reasoning_model in model.lower() for reasoning_model in reasoning_models)
         
         if is_reasoning_model:
-            lm = dspy.LM(f"azure/{model}", api_key=api_key, api_base=endpoint, temperature=1.0, max_tokens=16000)
+            if disable_cache:
+                lm = dspy.LM(f"azure/{model}", api_key=api_key, api_base=endpoint, temperature=1.0, max_tokens=16000, cache=False)
+            else:
+                lm = dspy.LM(f"azure/{model}", api_key=api_key, api_base=endpoint, temperature=1.0, max_tokens=16000)
         else:
-            lm = dspy.LM(f"azure/{model}", api_key=api_key, api_base=endpoint)
+            if disable_cache:
+                lm = dspy.LM(f"azure/{model}", api_key=api_key, api_base=endpoint, cache=False)
+            else:
+                lm = dspy.LM(f"azure/{model}", api_key=api_key, api_base=endpoint)
         return StandardLM(lm)
     elif provider == "mock":
         return MockModel(**kwargs)

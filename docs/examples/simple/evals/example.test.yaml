@@ -1,5 +1,5 @@
 description: Sample test cases demonstrating various eval patterns and content types
-grader: heuristic
+grader: llm_judge
 
 testcases:
 - id: simple-text-conversation

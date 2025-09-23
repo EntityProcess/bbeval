@@ -157,7 +157,8 @@ def _run_test_case_grading(
     verbose: bool,
     max_retries: int,
     target: Dict,
-    targets: List[Dict]
+    targets: List[Dict],
+    use_cache: bool = False
 ) -> EvaluationResult:
     """
     Execute a single test case with retry logic and conditional judging.
@@ -175,6 +176,7 @@ def _run_test_case_grading(
         max_retries: Maximum number of retries for timeout cases
         target: Current execution target configuration
         targets: List of all available targets
+        use_cache: Whether to enable DSPy caching for LLM responses
     
     Returns:
         EvaluationResult for the test case
@@ -193,8 +195,12 @@ def _run_test_case_grading(
             # Add guideline paths for VS Code provider
             prompt_inputs['guideline_paths'] = test_case.guideline_paths
             
-            # Run the model prediction with test_case_id
+            # Run the model prediction with conditional caching
             print(f"  Running prediction...")
+            if not use_cache:
+                print("    (Cache is disabled)")
+            else:
+                print("    (Cache is enabled)")
             prediction = evaluation_module(test_case_id=test_case.id, **prompt_inputs)
             candidate_response = prediction.answer
             
@@ -351,7 +357,8 @@ def run_evaluation(test_file: str,
                   verbose: bool = False,
                   test_id: str = None,
                   agent_timeout: int = 120,
-                  max_retries: int = 2) -> List[EvaluationResult]:
+                  max_retries: int = 2,
+                  use_cache: bool = False) -> List[EvaluationResult]:
     """
     Run evaluation on a test file using the specified target.
     
@@ -364,6 +371,7 @@ def run_evaluation(test_file: str,
         test_id: Optional test ID to run only a specific test case
         agent_timeout: Timeout in seconds for agent response polling
         max_retries: Maximum number of retries for timeout cases
+        use_cache: Whether to enable DSPy caching for LLM responses
     
     Returns:
         List of evaluation results
@@ -406,13 +414,30 @@ def run_evaluation(test_file: str,
         print(f"Configuring {provider} target: {target['name']}")
         
         try:
-            configure_dspy_model(provider, model, settings, polling_timeout=agent_timeout)
+            # Set DSPy global cache policy first
+            if not use_cache:
+                # Disable both disk and memory caches per docs
+                try:
+                    dspy.configure_cache(enable_disk_cache=False, enable_memory_cache=False)
+                except Exception:
+                    pass
+            else:
+                # Use default cache (enabled) unless changed by user env
+                try:
+                    dspy.configure_cache(enable_disk_cache=True, enable_memory_cache=True)
+                except Exception:
+                    pass
+
+            # Configure the LM, passing disable_cache to ensure LM-level cache is off
+            configure_dspy_model(provider, model, settings, polling_timeout=agent_timeout, disable_cache=(not use_cache))
         except ValueError as e:
             print(f"Error configuring target: {e}")
             if verbose:
                 import traceback
                 traceback.print_exc()
             sys.exit(1)
+    if verbose:
+        print(f"DSPy caching is {'ENABLED' if use_cache else 'DISABLED'}")
     
     results = []
     
@@ -437,7 +462,8 @@ def run_evaluation(test_file: str,
             verbose=verbose,
             max_retries=max_retries,
             target=target,
-            targets=targets
+            targets=targets,
+            use_cache=use_cache
         )
         results.append(result)
     
@@ -536,6 +562,8 @@ def main():
                        help='Timeout in seconds for agent response polling (default: 120)')
     parser.add_argument('--max-retries', type=int, default=2,
                        help='Maximum number of retries for timeout cases (default: 2)')
+    parser.add_argument('--cache', action='store_true',
+                       help='Enable DSPy caching for LLM responses')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Verbose output')
     
@@ -566,7 +594,12 @@ def main():
         output_path.parent.mkdir(parents=True, exist_ok=True)
         # Clear the output file
         if output_path.exists():
-            output_path.unlink()
+            try:
+                output_path.unlink()
+                if args.verbose:
+                    print(f"Cleared existing output file: {output_path}")
+            except Exception as e:
+                print(f"Warning: Unable to clear output file {output_path}: {e}")
     
     try:
         # Run evaluation
@@ -579,7 +612,8 @@ def main():
             verbose=args.verbose,
             test_id=args.test_id,
             agent_timeout=args.agent_timeout,
-            max_retries=args.max_retries
+            max_retries=args.max_retries,
+            use_cache=args.cache
         )
         
         # Print summary
