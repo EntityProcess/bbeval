@@ -285,3 +285,87 @@ def is_error_like(text: str) -> bool:
         'no response file was generated', 'timed out', 'cli not found'
     ]
     return any(lowered.startswith(p) for p in error_prefixes)
+
+
+def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str, model: str) -> EvaluationResult:
+    """
+    Grade a single test case against the candidate response using an LLM judge.
+    
+    Args:
+        test_case: TestCase object
+        candidate_response: Model-generated response
+        provider: Model provider name
+        model: Model name
+    
+    Returns:
+        EvaluationResult object
+    """
+    import dspy
+    from datetime import datetime
+    
+    # Define the LLM judge signature
+    class LLMJudge(dspy.Signature):
+        """Evaluate if a candidate response meets the expected outcome."""
+        
+        expected_outcome = dspy.InputField(desc="The expected outcome or criteria for the response")
+        candidate_response = dspy.InputField(desc="The actual response to evaluate")
+        
+        score = dspy.OutputField(desc="Score from 0.0 to 1.0 indicating how well the response meets the outcome")
+        reasoning = dspy.OutputField(desc="Brief explanation of the score")
+        hits = dspy.OutputField(desc="List of aspects the response got right (comma-separated)")
+        misses = dspy.OutputField(desc="List of aspects the response missed or got wrong (comma-separated)")
+    
+    # Create the judge module
+    judge = dspy.Predict(LLMJudge)
+    
+    try:
+        # Run the LLM judge
+        result = judge(
+            expected_outcome=test_case.outcome,
+            candidate_response=candidate_response
+        )
+        
+        # Parse the score
+        try:
+            score = float(result.score)
+            # Clamp score between 0.0 and 1.0
+            score = max(0.0, min(1.0, score))
+        except (ValueError, TypeError):
+            score = 0.0
+        
+        # Parse hits and misses
+        hits = [item.strip() for item in result.hits.split(',') if item.strip()] if result.hits else []
+        misses = [item.strip() for item in result.misses.split(',') if item.strip()] if result.misses else []
+        
+        # Create evaluation result
+        evaluation_result = EvaluationResult(
+            test_id=test_case.id,
+            score=score,
+            hits=hits,
+            misses=misses,
+            model_answer=candidate_response,
+            expected_aspect_count=len(hits) + len(misses),
+            provider=provider,
+            model=model,
+            timestamp=datetime.utcnow().isoformat() + 'Z',
+            raw_aspects=[result.reasoning] if result.reasoning else []
+        )
+        
+        return evaluation_result
+        
+    except Exception as e:
+        # Fallback to error result if LLM judge fails
+        error_result = EvaluationResult(
+            test_id=test_case.id,
+            score=0.0,
+            hits=[],
+            misses=[f"LLM judge failed: {str(e)}"],
+            model_answer=candidate_response,
+            expected_aspect_count=0,
+            provider=provider,
+            model=model,
+            timestamp=datetime.utcnow().isoformat() + 'Z',
+            raw_aspects=[]
+        )
+        
+        return error_result

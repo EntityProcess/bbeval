@@ -1,4 +1,5 @@
 description: Sample test cases demonstrating various eval patterns and content types
+grader: heuristic
 
 testcases:
 - id: simple-text-conversation

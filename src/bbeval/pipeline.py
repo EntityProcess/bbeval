@@ -13,7 +13,7 @@ from . import TestCase, EvaluationResult
 from .yaml_parser import load_testcases, build_prompt_inputs
 from .models import configure_dspy_model, AgentTimeoutError
 from .signatures import EvaluationModule, determine_signature_from_test_case
-from .grading import grade_test_case_heuristic
+from .grading import grade_test_case_heuristic, grade_test_case_llm_judge
 
 class EvaluationPipeline:
     """
@@ -97,13 +97,23 @@ class EvaluationPipeline:
                     prediction = evaluation_module(**prompt_inputs)
                     candidate_response = prediction.review
                     
-                    # Evaluate response
-                    result = grade_test_case_heuristic(
-                        test_case, 
-                        candidate_response, 
-                        self.provider, 
-                        self.model
-                    )
+                    # Evaluate response based on configured grader
+                    if test_case.grader == 'llm_judge':
+                        print("  Using LLM Judge for grading...")
+                        result = grade_test_case_llm_judge(
+                            test_case, 
+                            candidate_response, 
+                            self.provider, 
+                            self.model
+                        )
+                    else:  # Default to heuristic grader
+                        print("  Using heuristic grader...")
+                        result = grade_test_case_heuristic(
+                            test_case, 
+                            candidate_response, 
+                            self.provider, 
+                            self.model
+                        )
                     
                     results.append(result)
                     test_completed = True

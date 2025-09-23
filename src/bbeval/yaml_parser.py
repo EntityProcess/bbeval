@@ -55,6 +55,9 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
     if not data or 'testcases' not in data:
         raise ValueError(f"Invalid test file format: {test_file_path}")
     
+    # Get the global grader setting (default to 'heuristic' if not specified)
+    global_grader = data.get('grader', 'heuristic')
+    
     test_cases = []
     
     for raw_test in data.get('testcases', []):
@@ -141,7 +144,7 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
             guideline_paths=guideline_paths,
             code_snippets=code_snippets,
             outcome=raw_test['outcome'],
-            grader=raw_test.get('grader', 'heuristic')  # Default to 'heuristic' if not specified
+            grader=raw_test.get('grader', global_grader)  # Use test-specific grader or global default
         )
         
         test_cases.append(test_case)

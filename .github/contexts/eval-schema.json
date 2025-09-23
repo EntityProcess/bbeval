@@ -10,6 +10,7 @@
     },
     "grader": {
       "type": "string",
+      "enum": ["heuristic", "llm_judge"],
       "description": "Grading method or strategy for evaluating test outcomes"
     },
     "testcases": {
