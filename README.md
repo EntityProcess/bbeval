@@ -99,8 +99,6 @@ bbeval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/
 python -m bbeval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case"
 ```
 
-We recommend *Grok Code Fast 1* or *Claude Sonnet 4* for VS Code Copilot, as these models are more consistent in following instruction chains.
-
 ### Command Line Options
 
 - `--target TARGET`: Execution target name from targets.yaml (default: default)
@@ -114,6 +112,12 @@ We recommend *Grok Code Fast 1* or *Claude Sonnet 4* for VS Code Copilot, as the
 - `--verbose`: Verbose output
 
 Output goes to `.bbeval/results/{testname}_{timestamp}.jsonl` unless `--out` is provided.
+
+### Tips for VS Code Copilot Evals
+
+**Workspace Switching:** The runner automatically switches to the target workspace when running evals. Make sure you're not actively using another VS Code instance, as this could cause prompts to be injected into the wrong workspace.
+
+**Recommended Models:** Use *Claude Sonnet 4* or *Grok Code Fast 1* for best results, as these models are more consistent in following instruction chains.
 
 ## Requirements
 
