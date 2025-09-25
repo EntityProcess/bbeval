@@ -574,10 +574,34 @@ def main():
         print(f"Error: Test file not found: {args.test_file}")
         sys.exit(1)
     
-    # Load and find target configuration
+    # Determine target name with precedence: CLI flag (if provided and not default sentinel) > YAML file key > error
+    target_name_from_cli = args.target
+    target_name_from_file = None
+    try:
+        with open(args.test_file, 'r', encoding='utf-8') as f:
+            try:
+                test_suite_config = yaml.safe_load(f)
+                if isinstance(test_suite_config, dict):
+                    target_name_from_file = test_suite_config.get('target')
+            except yaml.YAMLError as ye:
+                print(f"Warning: Failed to parse test file YAML while looking for 'target': {ye}")
+    except Exception as e:
+        print(f"Warning: Unable to read test file for target detection: {e}")
+    
+    if target_name_from_cli and target_name_from_cli != 'default':
+        final_target_name = target_name_from_cli
+        print(f"Using target from --target flag: {final_target_name}")
+    elif target_name_from_file:
+        final_target_name = target_name_from_file
+        print(f"Using target from test file: {final_target_name}")
+    else:
+        print("Error: No target specified. Provide it via the --target flag or add a 'target:' key to your test.yaml file.")
+        sys.exit(1)
+
+    # Load targets and locate the chosen target configuration
     try:
         targets = load_targets(args.targets)
-        target = find_target(args.target, targets)
+        target = find_target(final_target_name, targets)
         print(f"Using target: {target['name']} (provider: {target['provider']})")
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}")
