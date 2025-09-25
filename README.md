@@ -187,7 +187,7 @@ When using VS Code or other AI agents that may experience timeouts, the evaluato
 
 Example with custom timeout settings:
 ```
-bbeval --target vscode_projectx --tests evals/projectx/example.test.yaml --agent-timeout 180 --max-retries 3
+bbeval evals/projectx/example.test.yaml --target vscode_projectx --agent-timeout 180 --max-retries 3
 ```
 
 ## How the evals work
