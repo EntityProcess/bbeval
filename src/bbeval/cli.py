@@ -534,16 +534,6 @@ def print_summary(results: List[EvaluationResult]):
 
 def main():
     """Main CLI entry point."""
-    # Load environment variables from .env file in current working directory
-    if DOTENV_AVAILABLE:
-        # Explicitly load .env from current working directory
-        env_file = Path.cwd() / ".env"
-        if env_file.exists():
-            load_dotenv(env_file)
-            print(f"Loaded .env file from: {env_file}")
-        else:
-            print(f"No .env file found at: {env_file}")
-    
     # Determine version dynamically from package metadata; fallback for dev
     try:
         __version__ = metadata.version("bbeval")
@@ -580,6 +570,17 @@ def main():
                        help='Verbose output')
     
     args = parser.parse_args()
+
+    # Load environment variables from .env file only after parsing so we can respect --verbose
+    if DOTENV_AVAILABLE:
+        env_file = Path.cwd() / ".env"
+        if env_file.exists():
+            load_dotenv(env_file)
+            if args.verbose:
+                print(f"Loaded .env file from: {env_file}")
+        else:
+            if args.verbose:
+                print(f"No .env file found at: {env_file}")
     
     # Validate test file exists
     if not Path(args.test_file).exists():

@@ -7,6 +7,7 @@ Tests the CLI helper functions for improved modularity.
 
 import unittest
 from unittest.mock import Mock, patch
+import io
 
 from bbeval import EvaluationResult
 from bbeval.models import AgentTimeoutError
@@ -301,12 +302,68 @@ class TestVersionFlag(unittest.TestCase):
     def test_version_flag_outputs_version(self, mock_meta_version):
         mock_meta_version.return_value = '9.9.9'
         test_args = ['bbeval', '--version']
-        with patch('sys.argv', test_args):
-            # Capture SystemExit raised by argparse after printing version
+        stdout = io.StringIO()
+        with patch('sys.argv', test_args), patch('sys.stdout', stdout):
             with self.assertRaises(SystemExit) as cm:
                 from bbeval.cli import main
                 main()
-            self.assertEqual(cm.exception.code, 0)
+        output = stdout.getvalue()
+        self.assertIn('9.9.9', output)
+        # Ensure .env diagnostics do not appear when just asking for version
+        self.assertNotIn('.env file', output)
+        self.assertEqual(cm.exception.code, 0)
+
+    @patch('bbeval.cli.Path')
+    @patch('bbeval.cli.load_targets')
+    @patch('bbeval.cli.find_target')
+    @patch('bbeval.cli.get_default_output_path')
+    def test_env_message_only_verbose(self, mock_out_path, mock_find_target, mock_load_targets, mock_path):
+        """Ensure .env load message only appears with --verbose during normal run."""
+        # Arrange minimal test file presence and targets
+        mock_path.return_value.exists.return_value = True
+        dummy_test_file = 'dummy.test.yaml'
+        # Path.cwd() / '.env' existence toggle
+        # First call for test file existence, second for env file
+        def side_effect(*args, **kwargs):
+            class P:
+                def __init__(self, name):
+                    self._name = name
+                def exists(self):
+                    # Simulate missing .env
+                    if self._name.endswith('.env'):
+                        return False
+                    return True
+                def __truediv__(self, other):
+                    return P(self._name + '/' + other)
+                def __str__(self):
+                    return self._name
+            return P(args[0])
+        mock_path.side_effect = side_effect
+        mock_load_targets.return_value = [{'name': 'default', 'provider': 'mock'}]
+        mock_find_target.return_value = {'name': 'default', 'provider': 'mock'}
+        mock_out_path.return_value = 'out.jsonl'
+
+        # Non-verbose run
+        stdout_nv = io.StringIO()
+        with patch('sys.argv', ['bbeval', dummy_test_file]), patch('sys.stdout', stdout_nv):
+            # Expect SystemExit because subsequent code may attempt real operations; guard
+            try:
+                from bbeval.cli import main
+                main()
+            except SystemExit:
+                pass
+        self.assertNotIn('.env file', stdout_nv.getvalue())
+
+        # Verbose run
+        stdout_v = io.StringIO()
+        with patch('sys.argv', ['bbeval', dummy_test_file, '--verbose']), patch('sys.stdout', stdout_v):
+            try:
+                from bbeval.cli import main
+                main()
+            except SystemExit:
+                pass
+        # Still missing .env, but now message should appear
+        self.assertIn('No .env file', stdout_v.getvalue())
 
 
 if __name__ == '__main__':
