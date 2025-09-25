@@ -32,10 +32,6 @@
             "type": "string",
             "description": "Optional note or additional context for the test case"
           },
-          "validator": {
-            "type": "string",
-            "description": "Optional path to validator script for building/validating generated code"
-          },
           "messages": {
             "type": "array",
             "description": "Conversation messages",
