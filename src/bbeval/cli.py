@@ -15,6 +15,7 @@ from typing import List, Dict
 import statistics
 from datetime import datetime, timezone
 import dspy
+from importlib import metadata
 
 # Import dotenv for later use
 try:
@@ -157,8 +158,7 @@ def _run_test_case_grading(
     verbose: bool,
     max_retries: int,
     target: Dict,
-    targets: List[Dict],
-    use_cache: bool = False
+    targets: List[Dict]
 ) -> EvaluationResult:
     """
     Execute a single test case with retry logic and conditional judging.
@@ -176,7 +176,6 @@ def _run_test_case_grading(
         max_retries: Maximum number of retries for timeout cases
         target: Current execution target configuration
         targets: List of all available targets
-        use_cache: Whether to enable DSPy caching for LLM responses
     
     Returns:
         EvaluationResult for the test case
@@ -197,10 +196,6 @@ def _run_test_case_grading(
             
             # Run the model prediction with conditional caching
             print(f"  Running prediction...")
-            if not use_cache:
-                print("    (Cache is disabled)")
-            else:
-                print("    (Cache is enabled)")
             prediction = evaluation_module(test_case_id=test_case.id, **prompt_inputs)
             candidate_response = prediction.answer
             
@@ -462,8 +457,7 @@ def run_evaluation(test_file: str,
             verbose=verbose,
             max_retries=max_retries,
             target=target,
-            targets=targets,
-            use_cache=use_cache
+            targets=targets
         )
         results.append(result)
     
@@ -533,17 +527,18 @@ def print_summary(results: List[EvaluationResult]):
 
 def main():
     """Main CLI entry point."""
-    # Load environment variables from .env file in current working directory
-    if DOTENV_AVAILABLE:
-        # Explicitly load .env from current working directory
-        env_file = Path.cwd() / ".env"
-        if env_file.exists():
-            load_dotenv(env_file)
-            print(f"Loaded .env file from: {env_file}")
-        else:
-            print(f"No .env file found at: {env_file}")
-    
+    # Determine version dynamically from package metadata; fallback for dev
+    try:
+        __version__ = metadata.version("bbeval")
+    except metadata.PackageNotFoundError:
+        __version__ = "0.0.0-dev"
+
     parser = argparse.ArgumentParser(description="Bbeval")
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'%(prog)s {__version__}'
+    )
     
     parser.add_argument('test_file',
                        help='Path to the .test.yaml file to run.')
@@ -568,16 +563,57 @@ def main():
                        help='Verbose output')
     
     args = parser.parse_args()
+
+    # Load environment variables from .env file only after parsing so we can respect --verbose
+    if DOTENV_AVAILABLE:
+        env_file = Path.cwd() / ".env"
+        if env_file.exists():
+            load_dotenv(env_file)
+            if args.verbose:
+                print(f"Loaded .env file from: {env_file}")
+        else:
+            if args.verbose:
+                print(f"No .env file found at: {env_file}")
     
     # Validate test file exists
     if not Path(args.test_file).exists():
         print(f"Error: Test file not found: {args.test_file}")
         sys.exit(1)
     
-    # Load and find target configuration
+    # Determine target name with precedence: CLI flag (if not 'default') > YAML file key > 'default'
+    target_name_from_cli = args.target
+    target_name_from_file = None
+    
+    # Try to read target from test file
+    try:
+        with open(args.test_file, 'r', encoding='utf-8') as f:
+            try:
+                test_suite_config = yaml.safe_load(f)
+                if isinstance(test_suite_config, dict):
+                    target_name_from_file = test_suite_config.get('target')
+            except yaml.YAMLError as ye:
+                print(f"Warning: Failed to parse test file YAML while looking for 'target': {ye}")
+    except Exception as e:
+        print(f"Warning: Unable to read test file for target detection: {e}")
+    
+    # Apply precedence logic
+    if target_name_from_cli != 'default':
+        # CLI override provided (not the default sentinel)
+        final_target_name = target_name_from_cli
+        print(f"Using target from --target flag: {final_target_name}")
+    elif target_name_from_file:
+        # Use target from YAML file
+        final_target_name = target_name_from_file
+        print(f"Using target from test file: {final_target_name}")
+    else:
+        # Fall back to 'default' target (original behavior)
+        final_target_name = 'default'
+        print(f"Using default target: {final_target_name}")
+
+    # Load targets and locate the chosen target configuration
     try:
         targets = load_targets(args.targets)
-        target = find_target(args.target, targets)
+        target = find_target(final_target_name, targets)
         print(f"Using target: {target['name']} (provider: {target['provider']})")
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}")

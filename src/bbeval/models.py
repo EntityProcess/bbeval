@@ -241,12 +241,23 @@ class VSCodeCopilot(dspy.BaseLM):
         import time
         
         try:
-            # Use PowerShell to run VS Code chat command with the request file
-            powershell_command = f'Get-Content -Raw -LiteralPath "{request_file_path.resolve()}"'
-            vscode_command = f'code chat -r "run command <powershell>{powershell_command}</powershell> and follow its instructions."'
-            
-            # Execute the PowerShell command
-            cmd = ['pwsh', '-NoProfile', '-NonInteractive', '-Command', vscode_command]
+            # Build the VS Code CLI chat command directly (avoid dependency on pwsh)
+            # We still embed a PowerShell snippet inside the Copilot chat instruction so Copilot
+            # can read the request file contents within VS Code context.
+            inner_powershell_command = f'Get-Content -Raw -LiteralPath "{request_file_path.resolve()}"'
+            chat_instruction = f"run command <powershell>{inner_powershell_command}</powershell> and follow its instructions."
+
+            # Prefer calling the VS Code CLI directly. This removes requirement for 'pwsh'.
+            # The 'code' executable must be on PATH (VS Code's 'Shell Command: Install 'code'' setting on macOS,
+            # or automatically available on Windows after install).
+            import shutil
+            code_cli = shutil.which('code')
+            if not code_cli:
+                return ("Error: VS Code CLI 'code' was not found on PATH. "
+                        "Ensure VS Code is installed and the command line launcher is enabled. "
+                        "On Windows this is usually automatic; on macOS use the Command Palette: 'Shell Command: Install code command'.")
+
+            cmd = [code_cli, 'chat', '-r', chat_instruction]
             
             # Also print a concise summary to stdout
             try:
@@ -266,12 +277,13 @@ class VSCodeCopilot(dspy.BaseLM):
             if result.returncode != 0:
                 # Build a richer error including command details for troubleshooting
                 try:
-                    (session_dir / 'last_powershell_stderr.log').write_text(result.stderr or '', encoding='utf-8')
+                    (session_dir / 'last_cli_stderr.log').write_text(result.stderr or '', encoding='utf-8')
                 except Exception:
                     pass
                 error_msg = (
-                    f"PowerShell command failed (exit code {result.returncode}): {result.stderr}\n"
-                    f"Command: {vscode_command}\n"
+                    f"VS Code CLI chat command failed (exit code {result.returncode}).\n"
+                    f"Command: {' '.join(cmd)}\n"
+                    f"Stderr: {result.stderr}\n"
                     f"Request file: {request_file_path.resolve()}\n"
                     f"Note: Full command details saved under {session_dir}"
                 )
@@ -302,7 +314,7 @@ class VSCodeCopilot(dspy.BaseLM):
             # Re-raise timeout errors to be caught by retry logic
             raise
         except FileNotFoundError:
-            return "Error: PowerShell not found. Please ensure 'pwsh' is available in PATH"
+            return "Error: Failed to execute VS Code CLI. Confirm that 'code' is available on PATH."
         except Exception as e:
             return f"Error: {str(e)}"
 

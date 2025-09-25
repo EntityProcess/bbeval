@@ -8,8 +8,6 @@ against test specifications without leaking expected answers into prompts.
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-__version__ = "0.1.0"
-
 @dataclass
 class TestMessage:
     """Represents a single message in a test conversation."""

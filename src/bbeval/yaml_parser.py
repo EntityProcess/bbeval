@@ -55,8 +55,8 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
     if not data or 'testcases' not in data:
         raise ValueError(f"Invalid test file format: {test_file_path}")
     
-    # Get the global grader setting (default to 'heuristic' if not specified)
-    global_grader = data.get('grader', 'heuristic')
+    # Get the global grader setting (default to 'llm_judge' if not specified)
+    global_grader = data.get('grader', 'llm_judge')
     
     test_cases = []
     

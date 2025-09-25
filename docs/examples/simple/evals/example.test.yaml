@@ -1,5 +1,6 @@
 description: Sample test cases demonstrating various eval patterns and content types
 grader: llm_judge
+target: azure_base
 
 testcases:
 - id: simple-text-conversation

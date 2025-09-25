@@ -4,17 +4,16 @@ description: 'Apply when writing evals in YAML format'
 ---
 
 ## Schema Reference
-- Schema: `#file:../contexts/eval-schema.json` (JSON Schema for validation and tooling)
+- Schema: #file:../contexts/eval-schema.json (JSON Schema for validation and tooling)
 - Format: YAML with structured content arrays
 
 ## Structure Requirements
 - Root level: `description` (optional), `testcases` (required)
-- Test case fields: `id` (required), `outcome` (required), `note` (optional), `validator` (optional), `messages` (required)
+- Test case fields: `id` (required), `outcome` (required), `messages` (required), `note` (optional), `grader` (optional)
 - Message fields: `role` (required), `content` (required)
 - Message roles: `system`, `user`, `assistant`
 - Content types: `text`, `file`
 - File paths must start with "/" for absolute paths (e.g., "/domains/cargowise/instructions/file.md")
-- Validator paths: Scripts for building/validating generated code (e.g., "/scripts/validators/csharp-build.ps1")
 
 ## Example
 ```yaml
