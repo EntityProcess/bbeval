@@ -206,5 +206,93 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         self.assertEqual(result.expected_aspect_count, 1)
 
 
+class TestTargetSelection(unittest.TestCase):
+    """Test cases for automatic target selection logic."""
+    
+    @patch('bbeval.cli.load_targets')
+    @patch('bbeval.cli.find_target')
+    @patch('bbeval.cli.Path')
+    @patch('bbeval.cli.yaml.safe_load')
+    @patch('builtins.open', create=True)
+    def test_cli_target_overrides_yaml(self, mock_open, mock_yaml_load, mock_path, mock_find_target, mock_load_targets):
+        """Test that CLI --target flag overrides YAML target specification."""
+        # Mock file operations
+        mock_path.return_value.exists.return_value = True
+        mock_yaml_load.return_value = {'target': 'yaml_target'}
+        mock_load_targets.return_value = [{'name': 'cli_target', 'provider': 'mock'}]
+        mock_find_target.return_value = {'name': 'cli_target', 'provider': 'mock'}
+        
+        # Mock sys.argv for argparse
+        test_args = ['bbeval', 'test.yaml', '--target', 'cli_target']
+        with patch('sys.argv', test_args):
+            from bbeval.cli import main
+            with patch('bbeval.cli.run_evaluation') as mock_run_eval:
+                with patch('bbeval.cli.print_summary'):
+                    with patch('bbeval.cli.get_default_output_path'):
+                        try:
+                            main()
+                        except SystemExit:
+                            pass  # Expected due to mocked environment
+        
+        # Verify CLI target was used (not YAML target)
+        mock_find_target.assert_called_with('cli_target', unittest.mock.ANY)
+    
+    @patch('bbeval.cli.load_targets')
+    @patch('bbeval.cli.find_target')
+    @patch('bbeval.cli.Path')
+    @patch('bbeval.cli.yaml.safe_load')
+    @patch('builtins.open', create=True)
+    def test_yaml_target_used_when_no_cli_override(self, mock_open, mock_yaml_load, mock_path, mock_find_target, mock_load_targets):
+        """Test that YAML target is used when CLI target is default."""
+        # Mock file operations
+        mock_path.return_value.exists.return_value = True
+        mock_yaml_load.return_value = {'target': 'yaml_target'}
+        mock_load_targets.return_value = [{'name': 'yaml_target', 'provider': 'mock'}]
+        mock_find_target.return_value = {'name': 'yaml_target', 'provider': 'mock'}
+        
+        # Mock sys.argv with default target (should use YAML)
+        test_args = ['bbeval', 'test.yaml']
+        with patch('sys.argv', test_args):
+            from bbeval.cli import main
+            with patch('bbeval.cli.run_evaluation') as mock_run_eval:
+                with patch('bbeval.cli.print_summary'):
+                    with patch('bbeval.cli.get_default_output_path'):
+                        try:
+                            main()
+                        except SystemExit:
+                            pass  # Expected due to mocked environment
+        
+        # Verify YAML target was used
+        mock_find_target.assert_called_with('yaml_target', unittest.mock.ANY)
+    
+    @patch('bbeval.cli.load_targets')
+    @patch('bbeval.cli.find_target')
+    @patch('bbeval.cli.Path')
+    @patch('bbeval.cli.yaml.safe_load')
+    @patch('builtins.open', create=True)
+    def test_default_target_when_no_specification(self, mock_open, mock_yaml_load, mock_path, mock_find_target, mock_load_targets):
+        """Test that 'default' target is used when no target is specified anywhere."""
+        # Mock file operations - no target in YAML
+        mock_path.return_value.exists.return_value = True
+        mock_yaml_load.return_value = {}  # No target key
+        mock_load_targets.return_value = [{'name': 'default', 'provider': 'mock'}]
+        mock_find_target.return_value = {'name': 'default', 'provider': 'mock'}
+        
+        # Mock sys.argv with default target and no YAML target
+        test_args = ['bbeval', 'test.yaml']
+        with patch('sys.argv', test_args):
+            from bbeval.cli import main
+            with patch('bbeval.cli.run_evaluation') as mock_run_eval:
+                with patch('bbeval.cli.print_summary'):
+                    with patch('bbeval.cli.get_default_output_path'):
+                        try:
+                            main()
+                        except SystemExit:
+                            pass  # Expected due to mocked environment
+        
+        # Verify default target was used
+        mock_find_target.assert_called_with('default', unittest.mock.ANY)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

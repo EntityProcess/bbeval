@@ -574,9 +574,11 @@ def main():
         print(f"Error: Test file not found: {args.test_file}")
         sys.exit(1)
     
-    # Determine target name with precedence: CLI flag (if provided and not default sentinel) > YAML file key > error
+    # Determine target name with precedence: CLI flag (if not 'default') > YAML file key > 'default'
     target_name_from_cli = args.target
     target_name_from_file = None
+    
+    # Try to read target from test file
     try:
         with open(args.test_file, 'r', encoding='utf-8') as f:
             try:
@@ -588,15 +590,19 @@ def main():
     except Exception as e:
         print(f"Warning: Unable to read test file for target detection: {e}")
     
-    if target_name_from_cli and target_name_from_cli != 'default':
+    # Apply precedence logic
+    if target_name_from_cli != 'default':
+        # CLI override provided (not the default sentinel)
         final_target_name = target_name_from_cli
         print(f"Using target from --target flag: {final_target_name}")
     elif target_name_from_file:
+        # Use target from YAML file
         final_target_name = target_name_from_file
         print(f"Using target from test file: {final_target_name}")
     else:
-        print("Error: No target specified. Provide it via the --target flag or add a 'target:' key to your test.yaml file.")
-        sys.exit(1)
+        # Fall back to 'default' target (original behavior)
+        final_target_name = 'default'
+        print(f"Using default target: {final_target_name}")
 
     # Load targets and locate the chosen target configuration
     try:

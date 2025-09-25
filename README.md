@@ -81,35 +81,41 @@ You are now ready to start development. You can run the tool with `bbeval`, edit
 
 ## Quick start
 
-**Run eval with default target (Azure):**
+**Run eval (target auto-selected from test file or CLI override):**
 ```powershell
-# Using the CLI command
-bbeval --tests "c:/path/to/test.yaml"
+# If your test.yaml contains "target: azure_base", it will be used automatically
+bbeval "c:/path/to/test.yaml"
 
-# Or using the Python module
-python -m bbeval.cli --tests "c:/path/to/test.yaml"
+# Override the test file's target with CLI flag
+bbeval --target vscode_projectx "c:/path/to/test.yaml"
 ```
 
-**Run a specific test case with custom targets path (VS Code Copilot):**
+**Run a specific test case with custom targets path:**
 ```powershell
-# Using the CLI command
-bbeval --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case"
-
-# Or using the Python module
-python -m bbeval.cli --target vscode_projectx --targets "c:/path/to/targets.yaml" --tests "c:/path/to/test.yaml" --test-id "my-test-case"
+bbeval --target vscode_projectx --targets "c:/path/to/targets.yaml" --test-id "my-test-case" "c:/path/to/test.yaml"
 ```
 
 ### Command Line Options
 
-- `--target TARGET`: Execution target name from targets.yaml (default: default)
+- `test_file`: Path to test YAML file (required, positional argument)
+- `--target TARGET`: Execution target name from targets.yaml (overrides target specified in test file)
 - `--targets TARGETS`: Path to targets.yaml file (default: ./.bbeval/targets.yaml)
-- `--tests TESTS`: Path to test YAML file (required)
 - `--test-id TEST_ID`: Run only the test case with this specific ID
 - `--out OUTPUT_FILE`: Output JSONL file path (default: results/{testname}_{timestamp}.jsonl)
 - `--dry-run`: Run with mock model for testing
 - `--agent-timeout SECONDS`: Timeout in seconds for agent response polling (default: 120)
 - `--max-retries COUNT`: Maximum number of retries for timeout cases (default: 2)
 - `--verbose`: Verbose output
+
+### Target Selection Priority
+
+The CLI determines which execution target to use with the following precedence:
+
+1. **CLI flag override**: `--target my_target` (when provided and not 'default')
+2. **Test file specification**: `target: my_target` key in the .test.yaml file
+3. **Default fallback**: Uses the 'default' target (original behavior)
+
+This allows test files to specify their preferred target while still allowing command-line overrides for flexibility, and maintains backward compatibility with existing workflows.
 
 Output goes to `.bbeval/results/{testname}_{timestamp}.jsonl` unless `--out` is provided.
 
