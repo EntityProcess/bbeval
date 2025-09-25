@@ -15,6 +15,7 @@ from typing import List, Dict
 import statistics
 from datetime import datetime, timezone
 import dspy
+from importlib import metadata
 
 # Import dotenv for later use
 try:
@@ -543,7 +544,18 @@ def main():
         else:
             print(f"No .env file found at: {env_file}")
     
+    # Determine version dynamically from package metadata; fallback for dev
+    try:
+        __version__ = metadata.version("bbeval")
+    except metadata.PackageNotFoundError:
+        __version__ = "0.0.0-dev"
+
     parser = argparse.ArgumentParser(description="Bbeval")
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'%(prog)s {__version__}'
+    )
     
     parser.add_argument('test_file',
                        help='Path to the .test.yaml file to run.')
