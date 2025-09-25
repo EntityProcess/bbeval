@@ -158,8 +158,7 @@ def _run_test_case_grading(
     verbose: bool,
     max_retries: int,
     target: Dict,
-    targets: List[Dict],
-    use_cache: bool = False
+    targets: List[Dict]
 ) -> EvaluationResult:
     """
     Execute a single test case with retry logic and conditional judging.
@@ -177,7 +176,6 @@ def _run_test_case_grading(
         max_retries: Maximum number of retries for timeout cases
         target: Current execution target configuration
         targets: List of all available targets
-        use_cache: Whether to enable DSPy caching for LLM responses
     
     Returns:
         EvaluationResult for the test case
@@ -198,10 +196,6 @@ def _run_test_case_grading(
             
             # Run the model prediction with conditional caching
             print(f"  Running prediction...")
-            if not use_cache:
-                print("    (Cache is disabled)")
-            else:
-                print("    (Cache is enabled)")
             prediction = evaluation_module(test_case_id=test_case.id, **prompt_inputs)
             candidate_response = prediction.answer
             
@@ -463,8 +457,7 @@ def run_evaluation(test_file: str,
             verbose=verbose,
             max_retries=max_retries,
             target=target,
-            targets=targets,
-            use_cache=use_cache
+            targets=targets
         )
         results.append(result)
     
