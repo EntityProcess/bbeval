@@ -294,5 +294,20 @@ class TestTargetSelection(unittest.TestCase):
         mock_find_target.assert_called_with('default', unittest.mock.ANY)
 
 
+class TestVersionFlag(unittest.TestCase):
+    """Test the --version flag for the CLI."""
+
+    @patch('bbeval.cli.metadata.version')
+    def test_version_flag_outputs_version(self, mock_meta_version):
+        mock_meta_version.return_value = '9.9.9'
+        test_args = ['bbeval', '--version']
+        with patch('sys.argv', test_args):
+            # Capture SystemExit raised by argparse after printing version
+            with self.assertRaises(SystemExit) as cm:
+                from bbeval.cli import main
+                main()
+            self.assertEqual(cm.exception.code, 0)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
