@@ -10,8 +10,12 @@
     },
     "grader": {
       "type": "string",
-      "enum": ["heuristic", "llm_judge"],
+      "enum": ["llm_judge", "heuristic"],
       "description": "Grading method or strategy for evaluating test outcomes"
+    },
+    "target": {
+      "type": "string",
+      "description": "Target configuration name for running evaluations (e.g., azure_base, vscode_projectx)"
     },
     "testcases": {
       "type": "array",

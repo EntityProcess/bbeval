@@ -8,8 +8,8 @@ description: 'Apply when writing evals in YAML format'
 - Format: YAML with structured content arrays
 
 ## Structure Requirements
-- Root level: `description` (optional), `testcases` (required)
-- Test case fields: `id` (required), `outcome` (required), `messages` (required), `note` (optional), `grader` (optional)
+- Root level: `description` (optional), `grader` (optional), `target` (optional), `testcases` (required)
+- Test case fields: `id` (required), `outcome` (required), `messages` (required), `note` (optional)
 - Message fields: `role` (required), `content` (required)
 - Message roles: `system`, `user`, `assistant`
 - Content types: `text`, `file`
@@ -18,7 +18,8 @@ description: 'Apply when writing evals in YAML format'
 ## Example
 ```yaml
 description: Evals for analyzing code patterns
-grader: heuristic
+grader: llm_judge
+target: azure_base
 
 testcases:
 - id: external-file-reference-system-context
