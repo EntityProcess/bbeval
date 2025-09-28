@@ -218,6 +218,8 @@ def _run_test_case_grading(
             if test_case.grader == 'llm_judge':
                 # Use LLM grader
                 print("  Using LLM Judge for grading...")
+                grader_prompt_content = None  # Initialize for both VSCode and non-VSCode cases
+                
                 # For VSCode provider, we need to temporarily switch to a standard model for judging
                 # to avoid double JSON wrapping and incorrect file naming
                 if provider.lower() == "vscode":
@@ -238,6 +240,10 @@ def _run_test_case_grading(
                             reference_answer=test_case.expected_assistant_raw,
                             generated_answer=candidate_response
                         )
+                        
+                        # Capture grader raw request from judge model
+                        last_interaction = dspy.settings.lm.history[-1]
+                        grader_prompt_content = last_interaction.get('prompt') or last_interaction.get('messages')
                     except Exception as e:
                         print(f"  Warning: Failed to create judge model, falling back to mock: {e}")
                         # Fallback to mock model if judge creation fails
@@ -252,6 +258,10 @@ def _run_test_case_grading(
                             reference_answer=test_case.expected_assistant_raw,
                             generated_answer=candidate_response
                         )
+                        
+                        # Capture grader raw request from mock model
+                        last_interaction = dspy.settings.lm.history[-1]
+                        grader_prompt_content = last_interaction.get('prompt') or last_interaction.get('messages')
                     finally:
                         # Restore original model
                         print(f"  Restoring original VSCode model...")
@@ -264,6 +274,11 @@ def _run_test_case_grading(
                         reference_answer=test_case.expected_assistant_raw,
                         generated_answer=candidate_response
                     )
+
+                    # Get the last history entry for grader_raw_request
+                    last_interaction = dspy.settings.lm.history[-1]
+                    # The prompt will be in 'prompt' for completion models or 'messages' for chat models
+                    grader_prompt_content = last_interaction.get('prompt') or last_interaction.get('messages')
                 
                 result = EvaluationResult(
                     test_id=test_case.id,
@@ -276,16 +291,8 @@ def _run_test_case_grading(
                     timestamp=datetime.now(timezone.utc).isoformat(),
                     raw_request=prompt_inputs  # capture structured prompt inputs
                 )
-                # Attach judge raw request details for auditing (simplified; no low-level forward capture)
-                result.grader_raw_request = {
-                    'signature': 'QualityGrader',
-                    'inputs': {
-                        'expected_outcome': test_case.outcome,
-                        'task_requirements': test_case.task,
-                        'reference_answer': test_case.expected_assistant_raw,
-                        'generated_answer': candidate_response
-                    }
-                }
+                # Attach judge raw request details for auditing
+                result.grader_raw_request = grader_prompt_content
             else:
                 # Use heuristic grader (default)
                 print(f"  Evaluating response with heuristic grader...")
