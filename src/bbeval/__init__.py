@@ -39,7 +39,7 @@ class EvaluationResult:
     timestamp: str
     raw_aspects: Optional[list[str]] = None
     # Raw request metadata capturing what was actually sent to the model.
-    # For standard providers this includes the structured fields (task, guidelines, code, context).
+    # For standard providers this includes the structured fields (request, guidelines).
     # For the VS Code provider it additionally captures the enhanced prompt written to the .req.md file
     # and the path to that file so downstream graders / audits can reconstruct the exact conversation context.
     raw_request: Optional[dict] = None

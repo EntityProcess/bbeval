@@ -4,16 +4,13 @@ import dspy
 
 
 class EvalSignature(dspy.Signature):
-    """A refined signature that takes a complete user request and uses a separate outcome for validation."""
+    """A refined signature that takes a complete user request."""
 
     request = dspy.InputField(
         desc="The user's full request, including all instructions, context, and relevant code snippets."
     )
     guidelines = dspy.InputField(
         desc="Optional long-form documentation or rules to follow as background context."
-    )
-    outcome = dspy.InputField(
-        desc="The expected result or success criteria. This is used for VALIDATING the answer, not generating it."
     )
 
     answer = dspy.OutputField(

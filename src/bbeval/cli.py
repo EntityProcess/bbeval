@@ -197,7 +197,6 @@ def _run_test_case_grading(
                 test_case_id=test_case.id,
                 request=prompt_inputs.get('request', ''),
                 guidelines=prompt_inputs.get('guidelines', ''),
-                outcome=test_case.outcome,  # Provided for validation context only per signature
                 guideline_paths=test_case.guideline_paths  # Pass guideline paths for VSCodeCopilot mandatory pre-read
             )
             candidate_response = prediction.answer
