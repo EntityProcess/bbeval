@@ -27,7 +27,7 @@ except ImportError:
 from . import EvaluationResult
 from .yaml_parser import load_testcases, build_prompt_inputs
 from .models import configure_dspy_model, AgentTimeoutError
-from .signatures import EvaluationModule, EvalSignature, QualityGrader
+from .signatures import EvaluationModule, QuerySignature, QualityGrader
 from .grading import grade_test_case_heuristic
 
 def load_targets(targets_file_path: str = None) -> List[Dict]:
@@ -477,9 +477,9 @@ def run_evaluation(test_file: str,
     for i, test_case in enumerate(test_cases, 1):
         print(f"\nProcessing test case {i}/{len(test_cases)}: {test_case.id}")
 
-        # Always use unified EvalSignature
-        evaluation_module = EvaluationModule(signature_class=EvalSignature)
-        print(f"  Using signature: EvalSignature")
+        # Always use unified QuerySignature
+        evaluation_module = EvaluationModule(signature_class=QuerySignature)
+        print(f"  Using signature: QuerySignature")
 
         result = _run_test_case_grading(
             test_case=test_case,

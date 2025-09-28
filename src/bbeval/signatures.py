@@ -3,8 +3,8 @@
 import dspy
 
 
-class EvalSignature(dspy.Signature):
-    """A refined signature that takes a complete user request."""
+class QuerySignature(dspy.Signature):
+    """A signature that takes a complete user request."""
 
     request = dspy.InputField(
         desc="The user's full request, including all instructions, context, and relevant code snippets."

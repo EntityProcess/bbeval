@@ -153,7 +153,7 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
 
 
 def build_prompt_inputs(test_case: TestCase, repo_root: Path) -> dict:
-    """Build consolidated prompt inputs for the new EvalSignature.
+    """Build consolidated prompt inputs for the new QuerySignature.
 
     Returns a dictionary with:
       - request: A single string concatenating all user-facing text, file contents, and fenced code blocks.

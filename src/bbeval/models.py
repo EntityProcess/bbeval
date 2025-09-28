@@ -421,7 +421,7 @@ class VSCodeCopilot(dspy.BaseLM):
         
         if messages:
             # Extract task content from DSPy's structured messages
-            # Look for the request field used by EvalSignature
+            # Look for the request field used by QuerySignature
             try:
                 combined = ''
                 if isinstance(messages, list):
@@ -434,7 +434,7 @@ class VSCodeCopilot(dspy.BaseLM):
                     combined = str(messages)
                 import re as _re
                 
-                # Look for request field (EvalSignature)
+                # Look for request field (QuerySignature)
                 # Note: We don't include 'expected_outcome' or 'outcome' to avoid leaking the answer
                 pattern = r"\[\[\s*##\s*request\s*##\s*\]\]\s*(.*?)\s*(?=\[\[|$)"
                 matches = list(_re.finditer(pattern, combined, flags=_re.IGNORECASE | _re.DOTALL))
@@ -475,7 +475,7 @@ class VSCodeCopilot(dspy.BaseLM):
         # For VSCodeCopilot, use a simple prompt structure since mandatory preread handles instructions
         # Just pass the task directly, don't build complex prompt sections
         
-        # Get task content from the request field (EvalSignature)
+        # Get task content from the request field (QuerySignature)
         # Note: We don't use 'expected_outcome' or 'outcome' to avoid leaking the answer
         task_content = kwargs.get('request', '')
         
