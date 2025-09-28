@@ -228,7 +228,7 @@ def detect_potential_hallucinations(candidate: str,
     
     return unique_hallucinations
 
-def grade_test_case_heuristic(test_case, candidate_response: str, provider: str, model: str) -> EvaluationResult:
+def grade_test_case_heuristic(test_case, candidate_response: str, provider: str, target_name: str) -> EvaluationResult:
     """
     Grade a single test case against the candidate response using heuristic scoring.
     
@@ -236,7 +236,7 @@ def grade_test_case_heuristic(test_case, candidate_response: str, provider: str,
         test_case: TestCase object
         candidate_response: Model-generated response
         provider: Model provider name
-        model: Model name
+        target_name: Target name used for evaluation
     
     Returns:
         EvaluationResult object
@@ -263,8 +263,7 @@ def grade_test_case_heuristic(test_case, candidate_response: str, provider: str,
         misses=scoring_result['misses'],
         model_answer=candidate_response,
         expected_aspect_count=len(expected_aspects),
-        provider=provider,
-        model=model,
+        target=target_name,
         timestamp=datetime.utcnow().isoformat() + 'Z',
         raw_aspects=expected_aspects
     )
@@ -287,7 +286,7 @@ def is_error_like(text: str) -> bool:
     return any(lowered.startswith(p) for p in error_prefixes)
 
 
-def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str, model: str) -> EvaluationResult:
+def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str, target_name: str) -> EvaluationResult:
     """
     Grade a single test case against the candidate response using an LLM judge.
     
@@ -295,7 +294,7 @@ def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str,
         test_case: TestCase object
         candidate_response: Model-generated response
         provider: Model provider name
-        model: Model name
+        target_name: Target name used for evaluation
     
     Returns:
         EvaluationResult object
@@ -345,8 +344,7 @@ def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str,
             misses=misses,
             model_answer=candidate_response,
             expected_aspect_count=len(hits) + len(misses),
-            provider=provider,
-            model=model,
+            target=target_name,
             timestamp=datetime.utcnow().isoformat() + 'Z',
             raw_aspects=[result.reasoning] if result.reasoning else []
         )
@@ -362,8 +360,7 @@ def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str,
             misses=[f"LLM judge failed: {str(e)}"],
             model_answer=candidate_response,
             expected_aspect_count=0,
-            provider=provider,
-            model=model,
+            target=target_name,
             timestamp=datetime.utcnow().isoformat() + 'Z',
             raw_aspects=[]
         )

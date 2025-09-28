@@ -35,8 +35,7 @@ class EvaluationResult:
     misses: list[str]
     model_answer: str
     expected_aspect_count: int
-    provider: str
-    model: str
+    target: str
     timestamp: str
     raw_aspects: Optional[list[str]] = None
     # Raw request metadata capturing what was actually sent to the model.
