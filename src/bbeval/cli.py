@@ -198,6 +198,18 @@ def _run_test_case_grading(
             print(f"  Running prediction...")
             prediction = evaluation_module(test_case_id=test_case.id, **prompt_inputs)
             candidate_response = prediction.answer
+
+            # If VS Code provider, attempt to enrich raw request with enhanced prompt metadata
+            if provider.lower() == 'vscode':
+                try:
+                    from .models import VSCodeCopilot
+                    lm = dspy.settings.lm
+                    if isinstance(lm, VSCodeCopilot) and hasattr(lm, '_last_raw_request'):
+                        vscode_meta = getattr(lm, '_last_raw_request')
+                        # Merge without overwriting existing keys
+                        prompt_inputs = {**prompt_inputs, 'vscode_request': vscode_meta}
+                except Exception:
+                    pass
             
             # Use grader configuration from test case
             if test_case.grader == 'llm_judge':
@@ -260,12 +272,18 @@ def _run_test_case_grading(
                     expected_aspect_count=1,
                     provider=provider,
                     model=model,
-                    timestamp=datetime.now(timezone.utc).isoformat()
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    raw_request=prompt_inputs  # capture structured prompt inputs
                 )
             else:
                 # Use heuristic grader (default)
                 print(f"  Evaluating response with heuristic grader...")
                 result = grade_test_case_heuristic(test_case, candidate_response, provider, model)
+                # Attach raw request prompt inputs for heuristic path as well
+                try:
+                    result.raw_request = prompt_inputs
+                except Exception:
+                    pass
 
             print(f"  Score: {result.score:.2f} ({result.hit_count}/{result.expected_aspect_count} aspects)")
             
@@ -295,7 +313,8 @@ def _run_test_case_grading(
                 provider=provider,
                 model=model,
                 timestamp="",
-                raw_aspects=[]
+                raw_aspects=[],
+                raw_request=prompt_inputs
             )
             
             # Write error result immediately if output file specified
@@ -334,7 +353,8 @@ def _run_test_case_grading(
                 provider=provider,
                 model=model,
                 timestamp="",
-                raw_aspects=[]
+                raw_aspects=[],
+                raw_request=prompt_inputs if 'prompt_inputs' in locals() else None
             )
             
             # Write error result immediately if output file specified
@@ -476,6 +496,8 @@ def write_result_line(result: EvaluationResult, output_file: str):
         'model': result.model,
         'timestamp': result.timestamp
     }
+    if getattr(result, 'raw_request', None) is not None:
+        result_dict['raw_request'] = result.raw_request
     
     with open(output_file, 'a', encoding='utf-8') as f:
         f.write(json.dumps(result_dict) + '\n')
