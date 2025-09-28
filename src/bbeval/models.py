@@ -421,7 +421,7 @@ class VSCodeCopilot(dspy.BaseLM):
         
         if messages:
             # Extract task content from DSPy's structured messages
-            # Look for the main task field (request or task_requirements)
+            # Look for the request field used by EvalSignature
             try:
                 combined = ''
                 if isinstance(messages, list):
@@ -434,16 +434,15 @@ class VSCodeCopilot(dspy.BaseLM):
                     combined = str(messages)
                 import re as _re
                 
-                # Look for request field (EvalSignature) or task_requirements field (QualityGrader)
+                # Look for request field (EvalSignature)
                 # Note: We don't include 'expected_outcome' or 'outcome' to avoid leaking the answer
-                for field_name in ['request', 'task_requirements']:
-                    pattern = rf"\[\[\s*##\s*{field_name}\s*##\s*\]\]\s*(.*?)\s*(?=\[\[|$)"
-                    matches = list(_re.finditer(pattern, combined, flags=_re.IGNORECASE | _re.DOTALL))
-                    # Prefer the last filled block that does not contain placeholders
-                    for m in reversed(matches):
-                        candidate = m.group(1).strip()
-                        if candidate and not any(placeholder in candidate for placeholder in ['{task}', '{task_requirements}', '{request}']):
-                            return candidate
+                pattern = r"\[\[\s*##\s*request\s*##\s*\]\]\s*(.*?)\s*(?=\[\[|$)"
+                matches = list(_re.finditer(pattern, combined, flags=_re.IGNORECASE | _re.DOTALL))
+                # Prefer the last filled block that does not contain placeholders
+                for m in reversed(matches):
+                    candidate = m.group(1).strip()
+                    if candidate and '{request}' not in candidate:
+                        return candidate
                 
                 # Heuristic fallback: pick the first question-like line
                 for line in combined.splitlines():
@@ -476,10 +475,9 @@ class VSCodeCopilot(dspy.BaseLM):
         # For VSCodeCopilot, use a simple prompt structure since mandatory preread handles instructions
         # Just pass the task directly, don't build complex prompt sections
         
-        # Get task content from the appropriate field based on current signatures
-        # EvalSignature uses 'request', QualityGrader uses 'task_requirements'
+        # Get task content from the request field (EvalSignature)
         # Note: We don't use 'expected_outcome' or 'outcome' to avoid leaking the answer
-        task_content = kwargs.get('request', '') or kwargs.get('task_requirements', '')
+        task_content = kwargs.get('request', '')
         
         # Get instruction files from guideline_paths
         instruction_files = kwargs.get('guideline_paths', [])
