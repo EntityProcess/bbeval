@@ -27,7 +27,7 @@ except ImportError:
 from . import EvaluationResult
 from .yaml_parser import load_testcases, build_prompt_inputs
 from .models import configure_dspy_model, AgentTimeoutError
-from .signatures import EvaluationModule, determine_signature_from_test_case, CodeGeneration, CodeComparisonJudge, QualityGrader
+from .signatures import EvaluationModule, EvalSignature, CodeComparisonJudge, QualityGrader
 from .grading import grade_test_case_heuristic
 
 def load_targets(targets_file_path: str = None) -> List[Dict]:
@@ -188,15 +188,17 @@ def _run_test_case_grading(
             print(f"  Retry attempt {retry_count}/{max_retries} for test case: {test_case.id}")
 
         try:
-            # Build prompt inputs (without leaking expected response)
+            # Build prompt inputs (request + guidelines)
             prompt_inputs = build_prompt_inputs(test_case, repo_root)
-            
-            # Add guideline paths for VS Code provider
-            prompt_inputs['guideline_paths'] = test_case.guideline_paths
-            
+
             # Run the model prediction with conditional caching
             print(f"  Running prediction...")
-            prediction = evaluation_module(test_case_id=test_case.id, **prompt_inputs)
+            prediction = evaluation_module(
+                test_case_id=test_case.id,
+                request=prompt_inputs.get('request', ''),
+                guidelines=prompt_inputs.get('guidelines', ''),
+                outcome=test_case.outcome  # Provided for validation context only per signature
+            )
             candidate_response = prediction.answer
 
             # If VS Code provider, attempt to enrich raw request with enhanced prompt metadata
@@ -207,6 +209,7 @@ def _run_test_case_grading(
                     if isinstance(lm, VSCodeCopilot) and hasattr(lm, '_last_raw_request'):
                         vscode_meta = getattr(lm, '_last_raw_request')
                         # Merge without overwriting existing keys
+                        # augment prompt inputs for logging only (not used for generation retroactively)
                         prompt_inputs = {**prompt_inputs, 'vscode_request': vscode_meta}
                 except Exception:
                     pass
@@ -457,13 +460,11 @@ def run_evaluation(test_file: str,
     
     for i, test_case in enumerate(test_cases, 1):
         print(f"\nProcessing test case {i}/{len(test_cases)}: {test_case.id}")
-        
-        # Determine appropriate signature for this test case
-        signature_class = determine_signature_from_test_case(test_case)
-        evaluation_module = EvaluationModule(signature_class=signature_class)
-        
-        print(f"  Using signature: {signature_class.__name__}")
-        
+
+        # Always use unified EvalSignature
+        evaluation_module = EvaluationModule(signature_class=EvalSignature)
+        print(f"  Using signature: EvalSignature")
+
         result = _run_test_case_grading(
             test_case=test_case,
             evaluation_module=evaluation_module,
