@@ -237,7 +237,7 @@ def _run_test_case_grading(
                         llm_judge = dspy.Predict(QualityGrader)
                         judgement = llm_judge(
                             expected_outcome=test_case.outcome,
-                            task_requirements=test_case.task,
+                            request=test_case.task,
                             reference_answer=test_case.expected_assistant_raw,
                             generated_answer=candidate_response
                         )
@@ -255,7 +255,7 @@ def _run_test_case_grading(
                         llm_judge = dspy.Predict(QualityGrader)
                         judgement = llm_judge(
                             expected_outcome=test_case.outcome,
-                            task_requirements=test_case.task,
+                            request=test_case.task,
                             reference_answer=test_case.expected_assistant_raw,
                             generated_answer=candidate_response
                         )
@@ -271,7 +271,7 @@ def _run_test_case_grading(
                     llm_judge = dspy.Predict(QualityGrader)
                     judgement = llm_judge(
                         expected_outcome=test_case.outcome,
-                        task_requirements=test_case.task,
+                        request=test_case.task,
                         reference_answer=test_case.expected_assistant_raw,
                         generated_answer=candidate_response
                     )
