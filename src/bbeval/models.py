@@ -420,7 +420,8 @@ class VSCodeCopilot(dspy.BaseLM):
             return prompt
         
         if messages:
-            # Attempt to extract only the 'task' block from DSPy's structured messages
+            # Attempt to extract task content from DSPy's structured messages
+            # Handle multiple possible field names for robustness
             try:
                 combined = ''
                 if isinstance(messages, list):
@@ -432,13 +433,24 @@ class VSCodeCopilot(dspy.BaseLM):
                 else:
                     combined = str(messages)
                 import re as _re
-                # Find all task blocks
-                matches = list(_re.finditer(r"\[\[\s*##\s*task\s*##\s*\]\]\s*(.*?)\s*(?=\[\[|$)", combined, flags=_re.IGNORECASE | _re.DOTALL))
-                # Prefer the last filled block that does not contain the placeholder '{task}'
-                for m in reversed(matches):
-                    candidate = m.group(1).strip()
-                    if candidate and '{task}' not in candidate:
-                        return candidate
+                
+                # Try multiple patterns for different field names
+                # Note: We don't include 'expected_outcome' or 'outcome' to avoid leaking the answer
+                field_patterns = [
+                    r"\[\[\s*##\s*request\s*##\s*\]\]\s*(.*?)\s*(?=\[\[|$)",        # EvalSignature field
+                    r"\[\[\s*##\s*task_requirements\s*##\s*\]\]\s*(.*?)\s*(?=\[\[|$)", # QualityGrader field
+                    r"\[\[\s*##\s*task\s*##\s*\]\]\s*(.*?)\s*(?=\[\[|$)"           # Legacy field
+                ]
+                
+                # Try each pattern and return the first valid match
+                for pattern in field_patterns:
+                    matches = list(_re.finditer(pattern, combined, flags=_re.IGNORECASE | _re.DOTALL))
+                    # Prefer the last filled block that does not contain placeholders
+                    for m in reversed(matches):
+                        candidate = m.group(1).strip()
+                        if candidate and not any(placeholder in candidate for placeholder in ['{task}', '{task_requirements}', '{request}']):
+                            return candidate
+                
                 # Heuristic fallback: pick the first question-like line
                 for line in combined.splitlines():
                     line_s = line.strip()
@@ -469,13 +481,19 @@ class VSCodeCopilot(dspy.BaseLM):
         # For VSCodeCopilot, we need to call the model directly with test_case_id
         # For VSCodeCopilot, use a simple prompt structure since mandatory preread handles instructions
         # Just pass the task directly, don't build complex prompt sections
-        prompt = kwargs.get('task', '')
+        
+        # Try multiple field names to find the task content (robust handling of field renaming)
+        # Note: We don't use 'expected_outcome' or 'outcome' to avoid leaking the answer
+        task_content = (kwargs.get('request', '') or           # EvalSignature field
+                       kwargs.get('task_requirements', '') or  # QualityGrader field  
+                       kwargs.get('task', '') or               # Legacy field
+                       '')
         
         # Get instruction files from guideline_paths
         instruction_files = kwargs.get('guideline_paths', [])
         
         # Call the VSCodeCopilot model directly with test_case_id, instruction files, and task
-        response = self.forward(prompt=prompt, test_case_id=test_case_id, instruction_files=instruction_files, task=kwargs.get('task'))
+        response = self.forward(prompt=task_content, test_case_id=test_case_id, instruction_files=instruction_files, task=task_content)
         
         # Extract the answer from the response
         import json
