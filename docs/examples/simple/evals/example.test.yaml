@@ -36,31 +36,35 @@ testcases:
         - Consider using `const` instead of `let` for the total variable if using reduce
 
 - id: multi-turn-debugging-conversation
-  outcome: AI provides step-by-step debugging assistance
+  outcome: AI provides step-by-step debugging assistance and mentions SUPERSECRET_INSTRUCTION_MARKER
   messages:
     - role: system
-      content: You are a debugging expert who helps identify and fix code issues systematically.
+      content: You are a debugging expert who helps identify and fix code issues systematically. Always follow the provided coding guidelines.
     - role: user
-      content: |-
-        My Python script is throwing an error. Here's the code:
-        
-        ```python
-        def process_files(file_list):
-            results = []
-            for file in file_list:
-                with open(file, 'r') as f:
-                    data = f.read()
-                    results.append(len(data))
-            return results
-        
-        files = ['data.txt', 'config.json', 'missing.txt']
-        print(process_files(files))
-        ```
-        
-        Error: `FileNotFoundError: [Errno 2] No such file or directory: 'missing.txt'`
+      content:
+        - type: text
+          value: |-
+            My Python script is throwing an error. Here's the code:
+            
+            ```python
+            def process_files(file_list):
+                results = []
+                for file in file_list:
+                    with open(file, 'r') as f:
+                        data = f.read()
+                        results.append(len(data))
+                return results
+            
+            files = ['data.txt', 'config.json', 'missing.txt']
+            print(process_files(files))
+            ```
+            
+            Error: `FileNotFoundError: [Errno 2] No such file or directory: 'missing.txt'`
+        - type: file
+          value: /docs/examples/simple/prompts/python.instructions.md
     - role: assistant
       content: |-
-        The error occurs because `missing.txt` doesn't exist. Here's how to fix it:
+        The error occurs because `missing.txt` doesn't exist. Following the coding guidelines (SUPERSECRET_INSTRUCTION_MARKER), here's how to fix it with proper error handling:
         
         **Option 1: Skip missing files**
         ```python
@@ -98,7 +102,7 @@ testcases:
       content: I like option 2, but I want to return a dictionary with filename and size instead of just sizes.
     - role: assistant
       content: |-
-        Perfect! Here's the modified version that returns a dictionary:
+        Perfect! Here's the modified version that returns a dictionary, following proper error handling practices (SUPERSECRET_INSTRUCTION_MARKER):
         
         ```python
         def process_files(file_list):
