@@ -27,7 +27,7 @@ except ImportError:
 from . import EvaluationResult
 from .yaml_parser import load_testcases, build_prompt_inputs
 from .models import configure_dspy_model, AgentTimeoutError
-from .signatures import EvaluationModule, determine_signature_from_test_case, CodeGeneration, CodeComparisonJudge, QualityGrader
+from .signatures import EvaluationModule, QuerySignature, QualityGrader
 from .grading import grade_test_case_heuristic
 
 def load_targets(targets_file_path: str = None) -> List[Dict]:
@@ -188,33 +188,24 @@ def _run_test_case_grading(
             print(f"  Retry attempt {retry_count}/{max_retries} for test case: {test_case.id}")
 
         try:
-            # Build prompt inputs (without leaking expected response)
+            # Build prompt inputs (request + guidelines)
             prompt_inputs = build_prompt_inputs(test_case, repo_root)
-            
-            # Add guideline paths for VS Code provider
-            prompt_inputs['guideline_paths'] = test_case.guideline_paths
-            
+
             # Run the model prediction with conditional caching
             print(f"  Running prediction...")
-            prediction = evaluation_module(test_case_id=test_case.id, **prompt_inputs)
+            prediction = evaluation_module(
+                test_case_id=test_case.id,
+                request=prompt_inputs.get('request', ''),
+                guidelines=prompt_inputs.get('guidelines', ''),
+                guideline_paths=test_case.guideline_paths  # Pass guideline paths for VSCodeCopilot mandatory pre-read
+            )
             candidate_response = prediction.answer
-
-            # If VS Code provider, attempt to enrich raw request with enhanced prompt metadata
-            if provider.lower() == 'vscode':
-                try:
-                    from .models import VSCodeCopilot
-                    lm = dspy.settings.lm
-                    if isinstance(lm, VSCodeCopilot) and hasattr(lm, '_last_raw_request'):
-                        vscode_meta = getattr(lm, '_last_raw_request')
-                        # Merge without overwriting existing keys
-                        prompt_inputs = {**prompt_inputs, 'vscode_request': vscode_meta}
-                except Exception:
-                    pass
             
             # Use grader configuration from test case
             if test_case.grader == 'llm_judge':
                 # Use LLM grader
                 print("  Using LLM Judge for grading...")
+                grader_prompt_content = None  # Initialize for both VSCode and non-VSCode cases
                 
                 # For VSCode provider, we need to temporarily switch to a standard model for judging
                 # to avoid double JSON wrapping and incorrect file naming
@@ -231,11 +222,15 @@ def _run_test_case_grading(
                         
                         llm_judge = dspy.Predict(QualityGrader)
                         judgement = llm_judge(
-                            key_principle=test_case.outcome,
-                            task_requirements=test_case.task,
+                            expected_outcome=test_case.outcome,
+                            request=test_case.task,
                             reference_answer=test_case.expected_assistant_raw,
                             generated_answer=candidate_response
                         )
+                        
+                        # Capture grader raw request from judge model
+                        last_interaction = dspy.settings.lm.history[-1]
+                        grader_prompt_content = last_interaction.get('prompt') or last_interaction.get('messages')
                     except Exception as e:
                         print(f"  Warning: Failed to create judge model, falling back to mock: {e}")
                         # Fallback to mock model if judge creation fails
@@ -245,11 +240,15 @@ def _run_test_case_grading(
                         
                         llm_judge = dspy.Predict(QualityGrader)
                         judgement = llm_judge(
-                            key_principle=test_case.outcome,
-                            task_requirements=test_case.task,
+                            expected_outcome=test_case.outcome,
+                            request=test_case.task,
                             reference_answer=test_case.expected_assistant_raw,
                             generated_answer=candidate_response
                         )
+                        
+                        # Capture grader raw request from mock model
+                        last_interaction = dspy.settings.lm.history[-1]
+                        grader_prompt_content = last_interaction.get('prompt') or last_interaction.get('messages')
                     finally:
                         # Restore original model
                         print(f"  Restoring original VSCode model...")
@@ -257,23 +256,48 @@ def _run_test_case_grading(
                 else:
                     llm_judge = dspy.Predict(QualityGrader)
                     judgement = llm_judge(
-                        key_principle=test_case.outcome,
-                        task_requirements=test_case.task,
+                        expected_outcome=test_case.outcome,
+                        request=test_case.task,
                         reference_answer=test_case.expected_assistant_raw,
                         generated_answer=candidate_response
                     )
+
+                    # Get the last history entry for grader_raw_request
+                    last_interaction = dspy.settings.lm.history[-1]
+                    # The prompt will be in 'prompt' for completion models or 'messages' for chat models
+                    grader_prompt_content = last_interaction.get('prompt') or last_interaction.get('messages')
+                
+                # Parse hits and misses from judgement
+                hits = []
+                misses = []
+                if hasattr(judgement, 'hits') and judgement.hits:
+                    if isinstance(judgement.hits, list):
+                        hits = judgement.hits
+                    else:
+                        hits = [judgement.hits]  # Convert single string to list
+                if hasattr(judgement, 'misses') and judgement.misses:
+                    if isinstance(judgement.misses, list):
+                        misses = judgement.misses
+                    else:
+                        misses = [judgement.misses]  # Convert single string to list
+                
+                # Get reasoning if available
+                reasoning = getattr(judgement, 'reasoning', None)
                 
                 result = EvaluationResult(
                     test_id=test_case.id,
                     score=float(judgement.score),
-                    hits=[judgement.reasoning],
-                    misses=[],
+                    hits=hits,
+                    misses=misses,
                     model_answer=candidate_response,
-                    expected_aspect_count=1,
+                    expected_aspect_count=len(hits) + len(misses) if (hits or misses) else 1,
                     target=target['name'],
                     timestamp=datetime.now(timezone.utc).isoformat(),
+                    reasoning=reasoning,
                     raw_request=prompt_inputs  # capture structured prompt inputs
                 )
+                # Attach judge raw request details for auditing
+                result.grader_raw_request = grader_prompt_content
             else:
                 # Use heuristic grader (default)
                 print(f"  Evaluating response with heuristic grader...")
@@ -457,13 +481,11 @@ def run_evaluation(test_file: str,
     
     for i, test_case in enumerate(test_cases, 1):
         print(f"\nProcessing test case {i}/{len(test_cases)}: {test_case.id}")
-        
-        # Determine appropriate signature for this test case
-        signature_class = determine_signature_from_test_case(test_case)
-        evaluation_module = EvaluationModule(signature_class=signature_class)
-        
-        print(f"  Using signature: {signature_class.__name__}")
-        
+
+        # Always use unified QuerySignature
+        evaluation_module = EvaluationModule(signature_class=QuerySignature)
+        print(f"  Using signature: QuerySignature")
+
         result = _run_test_case_grading(
             test_case=test_case,
             evaluation_module=evaluation_module,
@@ -494,8 +516,12 @@ def write_result_line(result: EvaluationResult, output_file: str):
         'target': result.target,
         'timestamp': result.timestamp
     }
+    if getattr(result, 'reasoning', None) is not None:
+        result_dict['reasoning'] = result.reasoning
     if getattr(result, 'raw_request', None) is not None:
         result_dict['raw_request'] = result.raw_request
+    if getattr(result, 'grader_raw_request', None) is not None:
+        result_dict['grader_raw_request'] = result.grader_raw_request
     
     with open(output_file, 'a', encoding='utf-8') as f:
         f.write(json.dumps(result_dict) + '\n')

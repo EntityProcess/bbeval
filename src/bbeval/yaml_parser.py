@@ -62,7 +62,7 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
     
     for raw_test in data.get('testcases', []):
         if 'id' not in raw_test or 'outcome' not in raw_test or 'messages' not in raw_test:
-            print(f"Warning: Skipping incomplete test case: {raw_test.get('id', 'unknown')}")
+            print(f"\033[33mWarning: Skipping incomplete test case: {raw_test.get('id', 'unknown')}\033[0m")
             continue
         
         # Separate user and assistant messages
@@ -70,11 +70,11 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
         assistant_msgs = [msg for msg in raw_test['messages'] if msg.get('role') == 'assistant']
         
         if not assistant_msgs:
-            print(f"Warning: No assistant message found for test case: {raw_test['id']}")
+            print(f"\033[33mWarning: No assistant message found for test case: {raw_test['id']}\033[0m")
             continue
         
         if len(assistant_msgs) > 1:
-            print(f"Warning: Multiple assistant messages found for test case: {raw_test['id']}, using first")
+            print(f"\033[33mWarning: Multiple assistant messages found for test case: {raw_test['id']}, using first\033[0m")
         # Process user segments
         user_segments = []
         guideline_paths = []
@@ -110,9 +110,9 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
                                         'text': file_content
                                     })
                             except Exception as e:
-                                print(f"Warning: Could not read file {full_path}: {e}")
+                                print(f"\033[33mWarning: Could not read file {full_path}: {e}\033[0m")
                         else:
-                            print(f"Warning: File not found: {full_path}")
+                            print(f"\033[33mWarning: File not found: {full_path}\033[0m")
                     else:
                         # Handle text or other segment types
                         user_segments.append(segment)
@@ -153,44 +153,41 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
 
 
 def build_prompt_inputs(test_case: TestCase, repo_root: Path) -> dict:
+    """Build consolidated prompt inputs for the new QuerySignature.
+
+    Returns a dictionary with:
+      - request: A single string concatenating all user-facing text, file contents, and fenced code blocks.
+      - guidelines: Concatenated content of guideline files only.
     """
-    Build prompt inputs from a test case without leaking expected assistant response.
-    
-    Args:
-        test_case: The test case to build inputs for
-        repo_root: Repository root for resolving paths
-    
-    Returns:
-        Dictionary with task, guidelines, and code for the model
-    """
-    # Collect guideline content
-    guidelines = []
+    # Gather guidelines content
+    guideline_contents = []
     for path in test_case.guideline_paths:
         full_path = repo_root / path
         if full_path.exists():
             try:
                 with open(full_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    guidelines.append(f"=== {path} ===\n{content}")
+                    guideline_contents.append(f"=== {path} ===\n{f.read()}")
             except Exception as e:
-                print(f"Warning: Could not read guideline file {full_path}: {e}")
-    
-    # Collect code snippets and text content
-    code_parts = []
-    text_parts = []
-    
+                print(f"\033[33mWarning: Could not read guideline file {full_path}: {e}\033[0m")
+
+    # Build request from user segments (text + file contents) and extracted code blocks
+    request_parts = []
     for segment in test_case.user_segments:
         if segment.get('type') == 'file':
-            code_parts.append(f"=== {segment.get('path', 'file')} ===\n{segment.get('text', '')}")
+            # Include file path header for clarity
+            request_parts.append(f"=== {segment.get('path', 'file')} ===\n{segment.get('text', '')}")
         elif segment.get('type') == 'text':
-            text_parts.append(segment.get('value', ''))
-    
-    # Add extracted code snippets
-    code_parts.extend(test_case.code_snippets)
-    
+            request_parts.append(segment.get('value', ''))
+        else:
+            # Generic handling for any other segment types with a value field
+            if 'value' in segment:
+                request_parts.append(str(segment['value']))
+
+    # Append fenced code blocks extracted earlier
+    if test_case.code_snippets:
+        request_parts.append("\n".join(test_case.code_snippets))
+
     return {
-        'task': test_case.task,
-        'guidelines': '\n\n'.join(guidelines),
-        'code': '\n\n'.join(code_parts),
-        'context': '\n\n'.join(text_parts)
+        'request': '\n\n'.join([p for p in request_parts if p.strip()]),
+        'guidelines': '\n\n'.join(guideline_contents)
     }

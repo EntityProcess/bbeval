@@ -1,117 +1,39 @@
-"""
-DSPy signatures and modules used by the evaluator.
-"""
+"""DSPy signatures and modules used by the evaluator."""
 
 import dspy
-import re
-from typing import Type
 
-class CodeReview(dspy.Signature):
-    """Code review and analysis for any programming language."""
 
-    task = dspy.InputField(desc="The code review or analysis task")
-    guidelines = dspy.InputField(desc="Coding guidelines and best practices")
-    code = dspy.InputField(desc="Code to review and analyze")
-    context = dspy.InputField(desc="Additional context", prefix="Context:")
+class QuerySignature(dspy.Signature):
+    """A signature that takes a complete user request."""
 
-    answer = dspy.OutputField(desc="Code review with issues, recommendations, and best practices")
+    request = dspy.InputField(
+        desc="The user's full request, including all instructions, context, and relevant code snippets."
+    )
+    guidelines = dspy.InputField(
+        desc="Optional long-form documentation or rules to follow as background context."
+    )
 
-class KnowledgeQuery(dspy.Signature):
-    """Knowledge retrieval and explanation from codebase."""
-
-    task = dspy.InputField(desc="The knowledge query or question")
-    guidelines = dspy.InputField(desc="Domain knowledge and documentation")
-    code = dspy.InputField(desc="Relevant code examples and references")
-    context = dspy.InputField(desc="Additional context", prefix="Context:")
-
-    answer = dspy.OutputField(desc="Clear explanation with code references and examples")
-
-class CodeGeneration(dspy.Signature):
-    """Code generation and implementation."""
-
-    task = dspy.InputField(desc="The code generation task or requirement")
-    guidelines = dspy.InputField(desc="Architecture guidelines and patterns")
-    code = dspy.InputField(desc="Reference code and examples")
-    context = dspy.InputField(desc="Additional context", prefix="Context:")
-
-    answer = dspy.OutputField(desc="Complete code implementation with proper structure and patterns")
-
-def determine_signature_from_test_case(test_case) -> Type[dspy.Signature]:
-    """
-    Determine the appropriate signature class based on test case outcome and user content.
-    
-    Args:
-        test_case: TestCase object with outcome and task information
-        
-    Returns:
-        Appropriate DSPy signature class
-    """
-    outcome = test_case.outcome.lower()
-    task = test_case.task.lower()
-    
-    # Extract first line from task for analysis (most consistent approach)
-    first_line = task.split('\n')[0].strip()
-    
-    # Code generation patterns
-    generation_patterns = [
-        'create', 'creates', 'implement', 'build', 'generate', 'write.*new',
-        'write.*code', 'please create', 'should contain', 'processor.*creation',
-        'corresponding functionalities', 'convert.*to', 'i need.*prompt',
-        'i need.*for', 'convert.*yaml.*to'
-    ]
-    
-    # Knowledge query patterns  
-    knowledge_patterns = [
-        'what does.*stand for', 'resolves.*acronym', 'explains', 'defines',
-        'what is', 'find.*definition', 'according to', 'stands for',
-        'in the context of'
-    ]
-    
-    # Code review patterns (everything else - reviews, analysis, evaluation)
-    review_patterns = [
-        'review', 'analyze', 'assessment', 'evaluate', 'assess', 'check',
-        'flags', 'identifies', 'notes', 'finds', 'issues', 'violations',
-        'proper.*behavior', 'best practices', 'compliance'
-    ]
-    
-    # Check outcome and first line for patterns
-    combined_text = f"{outcome} {first_line}"
-    
-    if any(re.search(pattern, combined_text, re.IGNORECASE) for pattern in generation_patterns):
-        return CodeGeneration
-    elif any(re.search(pattern, combined_text, re.IGNORECASE) for pattern in knowledge_patterns):
-        return KnowledgeQuery
-    elif any(re.search(pattern, combined_text, re.IGNORECASE) for pattern in review_patterns):
-        return CodeReview
-    else:
-        # Default to code review for unknown patterns
-        return CodeReview
+    answer = dspy.OutputField(
+        desc="The final, complete answer that directly fulfills the request."
+    )
 
 class QualityGrader(dspy.Signature):
     """
-    Grades a generated answer against a reference answer, based on a key principle and the original task.
+    You are an expert evaluator. Your goal is to grade the generated_answer based on how well it achieves the expected_outcome for the original task_requirements.
+
+    Use the reference_answer as a gold standard for a high-quality response. The generated_answer does not need to match it verbatim, but it should capture the key points and follow the same spirit.
+
+    Be concise and focused in your evaluation. Provide succinct, specific feedback rather than verbose explanations.
     """
-    key_principle = dspy.InputField(desc="The key principle or rule the test case is designed to validate.")
-    task_requirements = dspy.InputField(desc="The original user request and code to be analyzed.")
-    reference_answer = dspy.InputField(desc="The ground truth or ideal answer.")
+    expected_outcome = dspy.InputField(desc="The high-level success criterion that the generated_answer should achieve.")
+    request = dspy.InputField(desc="The original user request to be analyzed.")
+    reference_answer = dspy.InputField(desc="The ground truth or ideal answer used as a gold standard for comparison.")
     generated_answer = dspy.InputField(desc="The answer generated by the model being evaluated.")
     
     score = dspy.OutputField(desc="A single float score between 0.0 and 1.0.")
-    reasoning = dspy.OutputField(desc="A brief explanation for the grade, focusing on how well the key principle was applied.")
-
-class CodeComparisonJudge(dspy.Signature):
-    """
-    Compares generated code against reference code based on task requirements and a specific outcome.
-    Outputs a direct score and reasoning.
-    """
-    
-    outcome = dspy.InputField(desc="The key principle or pattern the test case is designed to validate.")
-    task_requirements = dspy.InputField(desc="The original requirements for the code generation task.")
-    reference_code = dspy.InputField(desc="The ground truth or ideal code implementation from the test file.")
-    generated_code = dspy.InputField(desc="The code generated by the model being evaluated.")
-    
-    score = dspy.OutputField(desc="A single float score between 0.0 and 1.0 evaluating the generated code's adherence to the outcome.")
-    reasoning = dspy.OutputField(desc="A brief explanation for the given score, focusing on how well the outcome was achieved.")
+    hits = dspy.OutputField(desc="Brief, specific list of what the generated_answer did well or correctly achieved from the expected_outcome.")
+    misses = dspy.OutputField(desc="Brief, specific list of what the generated_answer missed, did incorrectly, or failed to achieve from the expected_outcome.")
+    reasoning = dspy.OutputField(desc="Concise explanation for the score (1-2 sentences max).")
 
 class EvaluationModule(dspy.Module):
     """A generic evaluation module that can use any provided signature."""

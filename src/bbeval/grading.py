@@ -288,7 +288,7 @@ def is_error_like(text: str) -> bool:
 
 def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str, target_name: str) -> EvaluationResult:
     """
-    Grade a single test case against the candidate response using an LLM judge.
+    Grade a single test case against the candidate response using QualityGrader.
     
     Args:
         test_case: TestCase object
@@ -301,27 +301,18 @@ def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str,
     """
     import dspy
     from datetime import datetime
+    from .signatures import QualityGrader
     
-    # Define the LLM judge signature
-    class LLMJudge(dspy.Signature):
-        """Evaluate if a candidate response meets the expected outcome."""
-        
-        expected_outcome = dspy.InputField(desc="The expected outcome or criteria for the response")
-        candidate_response = dspy.InputField(desc="The actual response to evaluate")
-        
-        score = dspy.OutputField(desc="Score from 0.0 to 1.0 indicating how well the response meets the outcome")
-        reasoning = dspy.OutputField(desc="Brief explanation of the score")
-        hits = dspy.OutputField(desc="List of aspects the response got right (comma-separated)")
-        misses = dspy.OutputField(desc="List of aspects the response missed or got wrong (comma-separated)")
-    
-    # Create the judge module
-    judge = dspy.Predict(LLMJudge)
+    # Create the judge module using QualityGrader
+    judge = dspy.Predict(QualityGrader)
     
     try:
-        # Run the LLM judge
+        # Run the QualityGrader
         result = judge(
             expected_outcome=test_case.outcome,
-            candidate_response=candidate_response
+            request=getattr(test_case, 'request', '') or '',
+            reference_answer=test_case.expected_assistant_raw,
+            generated_answer=candidate_response
         )
         
         # Parse the score
@@ -332,9 +323,19 @@ def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str,
         except (ValueError, TypeError):
             score = 0.0
         
-        # Parse hits and misses
-        hits = [item.strip() for item in result.hits.split(',') if item.strip()] if result.hits else []
-        misses = [item.strip() for item in result.misses.split(',') if item.strip()] if result.misses else []
+        # Extract hits and misses from QualityGrader output fields
+        hits = []
+        misses = []
+        if hasattr(result, 'hits') and result.hits:
+            if isinstance(result.hits, list):
+                hits = result.hits
+            else:
+                hits = [result.hits]  # Convert single string to list
+        if hasattr(result, 'misses') and result.misses:
+            if isinstance(result.misses, list):
+                misses = result.misses
+            else:
+                misses = [result.misses]  # Convert single string to list
         
         # Create evaluation result
         evaluation_result = EvaluationResult(
@@ -343,21 +344,22 @@ def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str,
             hits=hits,
             misses=misses,
             model_answer=candidate_response,
-            expected_aspect_count=len(hits) + len(misses),
+            expected_aspect_count=len(hits) + len(misses) if (hits or misses) else 1,
             target=target_name,
             timestamp=datetime.utcnow().isoformat() + 'Z',
-            raw_aspects=[result.reasoning] if result.reasoning else []
+            reasoning=getattr(result, 'reasoning', None),
+            raw_aspects=[result.reasoning] if hasattr(result, 'reasoning') and result.reasoning else []
         )
         
         return evaluation_result
         
     except Exception as e:
-        # Fallback to error result if LLM judge fails
+        # Fallback to error result if QualityGrader fails
         error_result = EvaluationResult(
             test_id=test_case.id,
             score=0.0,
             hits=[],
-            misses=[f"LLM judge failed: {str(e)}"],
+            misses=[f"QualityGrader failed: {str(e)}"],
             model_answer=candidate_response,
             expected_aspect_count=0,
             target=target_name,
