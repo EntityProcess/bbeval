@@ -200,19 +200,6 @@ def _run_test_case_grading(
                 guideline_paths=test_case.guideline_paths  # Pass guideline paths for VSCodeCopilot mandatory pre-read
             )
             candidate_response = prediction.answer
-
-            # If VS Code provider, attempt to enrich raw request with enhanced prompt metadata
-            if provider.lower() == 'vscode':
-                try:
-                    from .models import VSCodeCopilot
-                    lm = dspy.settings.lm
-                    if isinstance(lm, VSCodeCopilot) and hasattr(lm, '_last_raw_request'):
-                        vscode_meta = getattr(lm, '_last_raw_request')
-                        # Merge without overwriting existing keys
-                        # augment prompt inputs for logging only (not used for generation retroactively)
-                        prompt_inputs = {**prompt_inputs, 'vscode_request': vscode_meta}
-                except Exception:
-                    pass
             
             # Use grader configuration from test case
             if test_case.grader == 'llm_judge':
