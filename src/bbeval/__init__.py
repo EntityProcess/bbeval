@@ -43,6 +43,10 @@ class EvaluationResult:
     # For the VS Code provider it additionally captures the enhanced prompt written to the .req.md file
     # and the path to that file so downstream graders / audits can reconstruct the exact conversation context.
     raw_request: Optional[dict] = None
+    # Raw request information for the LLM judge (QualityGrader). Contains both the
+    # structured inputs we passed and, when available, low-level prompt/messages
+    # captured from the underlying LM forward() call for full auditability.
+    grader_raw_request: Optional[dict] = None
     
     @property
     def hit_count(self) -> int:

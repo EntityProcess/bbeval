@@ -224,7 +224,7 @@ Scoring:
 
 Output file:
 - Default: `.bbeval/results/{testname}_{YYYYMMDD_HHMMSS}.jsonl` (or use `--out`)
-- Fields: `test_id`, `score`, `hits`, `misses`, `model_answer`, `expected_aspect_count`, `target`, `timestamp`
+- Fields: `test_id`, `score`, `hits`, `misses`, `model_answer`, `expected_aspect_count`, `target`, `timestamp`, `raw_request`, `grader_raw_request`.
 
 ## Troubleshooting
 

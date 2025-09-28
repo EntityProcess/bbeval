@@ -218,7 +218,6 @@ def _run_test_case_grading(
             if test_case.grader == 'llm_judge':
                 # Use LLM grader
                 print("  Using LLM Judge for grading...")
-                
                 # For VSCode provider, we need to temporarily switch to a standard model for judging
                 # to avoid double JSON wrapping and incorrect file naming
                 if provider.lower() == "vscode":
@@ -277,6 +276,16 @@ def _run_test_case_grading(
                     timestamp=datetime.now(timezone.utc).isoformat(),
                     raw_request=prompt_inputs  # capture structured prompt inputs
                 )
+                # Attach judge raw request details for auditing (simplified; no low-level forward capture)
+                result.grader_raw_request = {
+                    'signature': 'QualityGrader',
+                    'inputs': {
+                        'key_principle': test_case.outcome,
+                        'task_requirements': test_case.task,
+                        'reference_answer': test_case.expected_assistant_raw,
+                        'generated_answer': candidate_response
+                    }
+                }
             else:
                 # Use heuristic grader (default)
                 print(f"  Evaluating response with heuristic grader...")
@@ -497,6 +506,8 @@ def write_result_line(result: EvaluationResult, output_file: str):
     }
     if getattr(result, 'raw_request', None) is not None:
         result_dict['raw_request'] = result.raw_request
+    if getattr(result, 'grader_raw_request', None) is not None:
+        result_dict['grader_raw_request'] = result.grader_raw_request
     
     with open(output_file, 'a', encoding='utf-8') as f:
         f.write(json.dumps(result_dict) + '\n')

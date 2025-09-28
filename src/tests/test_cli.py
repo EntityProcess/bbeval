@@ -197,6 +197,10 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         self.assertEqual(result.hits, ["Well implemented code"])
         self.assertEqual(result.misses, [])
         self.assertEqual(result.expected_aspect_count, 1)
+        # Verify reference answer via grader_raw_request
+        self.assertIsNotNone(result.grader_raw_request)
+        self.assertIn('inputs', result.grader_raw_request)
+        self.assertEqual(result.grader_raw_request['inputs']['reference_answer'], test_case.expected_assistant_raw)
 
 
 class TestTargetSelection(unittest.TestCase):
