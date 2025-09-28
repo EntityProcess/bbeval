@@ -27,7 +27,7 @@ except ImportError:
 from . import EvaluationResult
 from .yaml_parser import load_testcases, build_prompt_inputs
 from .models import configure_dspy_model, AgentTimeoutError
-from .signatures import EvaluationModule, EvalSignature, CodeComparisonJudge, QualityGrader
+from .signatures import EvaluationModule, EvalSignature, QualityGrader
 from .grading import grade_test_case_heuristic
 
 def load_targets(targets_file_path: str = None) -> List[Dict]:
