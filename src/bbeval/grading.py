@@ -323,15 +323,19 @@ def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str,
         except (ValueError, TypeError):
             score = 0.0
         
-        # Extract hits and misses from reasoning (QualityGrader doesn't have separate hits/misses fields)
+        # Extract hits and misses from QualityGrader output fields
         hits = []
         misses = []
-        if hasattr(result, 'reasoning') and result.reasoning:
-            reasoning_text = result.reasoning.lower()
-            if 'correct' in reasoning_text or 'good' in reasoning_text or 'well' in reasoning_text:
-                hits.append("Response demonstrates understanding")
-            if 'missing' in reasoning_text or 'incorrect' in reasoning_text or 'poor' in reasoning_text:
-                misses.append("Response has deficiencies")
+        if hasattr(result, 'hits') and result.hits:
+            if isinstance(result.hits, list):
+                hits = result.hits
+            else:
+                hits = [result.hits]  # Convert single string to list
+        if hasattr(result, 'misses') and result.misses:
+            if isinstance(result.misses, list):
+                misses = result.misses
+            else:
+                misses = [result.misses]  # Convert single string to list
         
         # Create evaluation result
         evaluation_result = EvaluationResult(
@@ -343,6 +347,7 @@ def grade_test_case_llm_judge(test_case, candidate_response: str, provider: str,
             expected_aspect_count=len(hits) + len(misses) if (hits or misses) else 1,
             target=target_name,
             timestamp=datetime.utcnow().isoformat() + 'Z',
+            reasoning=getattr(result, 'reasoning', None),
             raw_aspects=[result.reasoning] if hasattr(result, 'reasoning') and result.reasoning else []
         )
         

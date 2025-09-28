@@ -267,15 +267,33 @@ def _run_test_case_grading(
                     # The prompt will be in 'prompt' for completion models or 'messages' for chat models
                     grader_prompt_content = last_interaction.get('prompt') or last_interaction.get('messages')
                 
+                # Parse hits and misses from judgement
+                hits = []
+                misses = []
+                if hasattr(judgement, 'hits') and judgement.hits:
+                    if isinstance(judgement.hits, list):
+                        hits = judgement.hits
+                    else:
+                        hits = [judgement.hits]  # Convert single string to list
+                if hasattr(judgement, 'misses') and judgement.misses:
+                    if isinstance(judgement.misses, list):
+                        misses = judgement.misses
+                    else:
+                        misses = [judgement.misses]  # Convert single string to list
+                
+                # Get reasoning if available
+                reasoning = getattr(judgement, 'reasoning', None)
+                
                 result = EvaluationResult(
                     test_id=test_case.id,
                     score=float(judgement.score),
-                    hits=[judgement.reasoning],
-                    misses=[],
+                    hits=hits,
+                    misses=misses,
                     model_answer=candidate_response,
-                    expected_aspect_count=1,
+                    expected_aspect_count=len(hits) + len(misses) if (hits or misses) else 1,
                     target=target['name'],
                     timestamp=datetime.now(timezone.utc).isoformat(),
+                    reasoning=reasoning,
                     raw_request=prompt_inputs  # capture structured prompt inputs
                 )
                 # Attach judge raw request details for auditing
@@ -498,6 +516,8 @@ def write_result_line(result: EvaluationResult, output_file: str):
         'target': result.target,
         'timestamp': result.timestamp
     }
+    if getattr(result, 'reasoning', None) is not None:
+        result_dict['reasoning'] = result.reasoning
     if getattr(result, 'raw_request', None) is not None:
         result_dict['raw_request'] = result.raw_request
     if getattr(result, 'grader_raw_request', None) is not None:

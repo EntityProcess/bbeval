@@ -37,6 +37,7 @@ class EvaluationResult:
     expected_aspect_count: int
     target: str
     timestamp: str
+    reasoning: Optional[str] = None  # LLM judge reasoning for the score
     raw_aspects: Optional[list[str]] = None
     # Raw request metadata capturing what was actually sent to the model.
     # For standard providers this includes the structured fields (request, guidelines).
