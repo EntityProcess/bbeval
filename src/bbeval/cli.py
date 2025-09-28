@@ -169,7 +169,7 @@ def _run_test_case_grading(
         repo_root: Repository root path
         provider: Model provider name
         settings: Provider settings
-        model: Model identifier
+        model: Model identifier (used for judge model configuration)
         output_file: Optional output file path
         dry_run: Whether running in dry-run mode
         verbose: Whether to print verbose output
@@ -198,6 +198,18 @@ def _run_test_case_grading(
             print(f"  Running prediction...")
             prediction = evaluation_module(test_case_id=test_case.id, **prompt_inputs)
             candidate_response = prediction.answer
+
+            # If VS Code provider, attempt to enrich raw request with enhanced prompt metadata
+            if provider.lower() == 'vscode':
+                try:
+                    from .models import VSCodeCopilot
+                    lm = dspy.settings.lm
+                    if isinstance(lm, VSCodeCopilot) and hasattr(lm, '_last_raw_request'):
+                        vscode_meta = getattr(lm, '_last_raw_request')
+                        # Merge without overwriting existing keys
+                        prompt_inputs = {**prompt_inputs, 'vscode_request': vscode_meta}
+                except Exception:
+                    pass
             
             # Use grader configuration from test case
             if test_case.grader == 'llm_judge':
@@ -258,14 +270,19 @@ def _run_test_case_grading(
                     misses=[],
                     model_answer=candidate_response,
                     expected_aspect_count=1,
-                    provider=provider,
-                    model=model,
-                    timestamp=datetime.now(timezone.utc).isoformat()
+                    target=target['name'],
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    raw_request=prompt_inputs  # capture structured prompt inputs
                 )
             else:
                 # Use heuristic grader (default)
                 print(f"  Evaluating response with heuristic grader...")
-                result = grade_test_case_heuristic(test_case, candidate_response, provider, model)
+                result = grade_test_case_heuristic(test_case, candidate_response, provider, target['name'])
+                # Attach raw request prompt inputs for heuristic path as well
+                try:
+                    result.raw_request = prompt_inputs
+                except Exception:
+                    pass
 
             print(f"  Score: {result.score:.2f} ({result.hit_count}/{result.expected_aspect_count} aspects)")
             
@@ -292,10 +309,10 @@ def _run_test_case_grading(
                 misses=[f"Agent timeout after {max_retries} retries: {str(e)}"],
                 model_answer=f"Agent timeout occurred: {str(e)}",
                 expected_aspect_count=0,
-                provider=provider,
-                model=model,
+                target=target['name'],
                 timestamp="",
-                raw_aspects=[]
+                raw_aspects=[],
+                raw_request=prompt_inputs
             )
             
             # Write error result immediately if output file specified
@@ -331,10 +348,10 @@ def _run_test_case_grading(
                 misses=[f"Error: {str(e)}"],
                 model_answer=f"Error occurred: {str(e)}",
                 expected_aspect_count=0,
-                provider=provider,
-                model=model,
+                target=target['name'],
                 timestamp="",
-                raw_aspects=[]
+                raw_aspects=[],
+                raw_request=prompt_inputs if 'prompt_inputs' in locals() else None
             )
             
             # Write error result immediately if output file specified
@@ -396,7 +413,7 @@ def run_evaluation(test_file: str,
     # Extract target configuration
     provider = target['provider']
     settings = target.get('settings')
-    # VS Code Copilot has no base model parameter; model value is ignored in that case
+    # For DSPy configuration, we still need a model parameter (but not for results)
     model = os.getenv('LLM_MODEL', 'gpt-4')
     
     # Configure model
@@ -405,6 +422,8 @@ def run_evaluation(test_file: str,
         configure_dspy_model("mock", "mock-model")
         provider = "mock"
         model = "mock-model"
+        # Create a mock target for dry runs
+        target = {'name': f"{target['name']}-mock", 'provider': 'mock'}
     else:
         print(f"Configuring {provider} target: {target['name']}")
         
@@ -472,10 +491,11 @@ def write_result_line(result: EvaluationResult, output_file: str):
         'misses': result.misses,
         'model_answer': result.model_answer,
         'expected_aspect_count': result.expected_aspect_count,
-        'provider': result.provider,
-        'model': result.model,
+        'target': result.target,
         'timestamp': result.timestamp
     }
+    if getattr(result, 'raw_request', None) is not None:
+        result_dict['raw_request'] = result.raw_request
     
     with open(output_file, 'a', encoding='utf-8') as f:
         f.write(json.dumps(result_dict) + '\n')

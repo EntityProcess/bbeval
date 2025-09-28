@@ -362,6 +362,21 @@ class VSCodeCopilot(dspy.BaseLM):
         except Exception as e:
             raise RuntimeError(f"Failed to write request file {request_file_path}: {e}")
 
+        # Record raw request metadata for downstream capture in evaluation results
+        try:
+            self._last_raw_request = {
+                'provider': 'vscode',
+                'test_case_id': test_case_id,
+                'task': task,
+                'instruction_files': instruction_files,
+                'request_file': str(request_file_path.resolve()),
+                'reply_tmp_file': str(reply_tmp_path.resolve()),
+                'reply_final_file': str(reply_final_path.resolve()),
+                'enhanced_prompt': enhanced_prompt
+            }
+        except Exception:
+            pass
+
         # Execute the VS Code command and poll for response
         response_content = self._execute_vscode_command_and_poll(
             request_file_path, reply_final_path, reply_tmp_path, session_dir, test_case_id
