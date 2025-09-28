@@ -185,7 +185,7 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         # Verify LLM judge was used
         mock_dspy_predict.assert_called_once()
         mock_judge_instance.assert_called_once_with(
-            key_principle=test_case.outcome,
+            expected_outcome=test_case.outcome,
             task_requirements=test_case.task,
             reference_answer=test_case.expected_assistant_raw,
             generated_answer="Mock review response"
