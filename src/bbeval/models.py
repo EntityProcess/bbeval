@@ -420,8 +420,8 @@ class VSCodeCopilot(dspy.BaseLM):
             return prompt
         
         if messages:
-            # Attempt to extract task content from DSPy's structured messages
-            # Handle multiple possible field names for robustness
+            # Extract task content from DSPy's structured messages
+            # Look for the main task field (request or task_requirements)
             try:
                 combined = ''
                 if isinstance(messages, list):
@@ -434,16 +434,10 @@ class VSCodeCopilot(dspy.BaseLM):
                     combined = str(messages)
                 import re as _re
                 
-                # Try multiple patterns for different field names
+                # Look for request field (EvalSignature) or task_requirements field (QualityGrader)
                 # Note: We don't include 'expected_outcome' or 'outcome' to avoid leaking the answer
-                field_patterns = [
-                    r"\[\[\s*##\s*request\s*##\s*\]\]\s*(.*?)\s*(?=\[\[|$)",        # EvalSignature field
-                    r"\[\[\s*##\s*task_requirements\s*##\s*\]\]\s*(.*?)\s*(?=\[\[|$)", # QualityGrader field
-                    r"\[\[\s*##\s*task\s*##\s*\]\]\s*(.*?)\s*(?=\[\[|$)"           # Legacy field
-                ]
-                
-                # Try each pattern and return the first valid match
-                for pattern in field_patterns:
+                for field_name in ['request', 'task_requirements']:
+                    pattern = rf"\[\[\s*##\s*{field_name}\s*##\s*\]\]\s*(.*?)\s*(?=\[\[|$)"
                     matches = list(_re.finditer(pattern, combined, flags=_re.IGNORECASE | _re.DOTALL))
                     # Prefer the last filled block that does not contain placeholders
                     for m in reversed(matches):
@@ -482,12 +476,10 @@ class VSCodeCopilot(dspy.BaseLM):
         # For VSCodeCopilot, use a simple prompt structure since mandatory preread handles instructions
         # Just pass the task directly, don't build complex prompt sections
         
-        # Try multiple field names to find the task content (robust handling of field renaming)
+        # Get task content from the appropriate field based on current signatures
+        # EvalSignature uses 'request', QualityGrader uses 'task_requirements'
         # Note: We don't use 'expected_outcome' or 'outcome' to avoid leaking the answer
-        task_content = (kwargs.get('request', '') or           # EvalSignature field
-                       kwargs.get('task_requirements', '') or  # QualityGrader field  
-                       kwargs.get('task', '') or               # Legacy field
-                       '')
+        task_content = kwargs.get('request', '') or kwargs.get('task_requirements', '')
         
         # Get instruction files from guideline_paths
         instruction_files = kwargs.get('guideline_paths', [])
