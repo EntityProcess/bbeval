@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any, Tuple
 import dspy
 from pathlib import Path
 
-def focus_vscode_workspace(workspace_env_var: str, verbose: bool = True) -> bool:
+def focus_vscode_workspace(workspace_env_var: str, verbose: bool = False) -> bool:
     """Focus the VS Code workspace."""
     if not workspace_env_var:
         return False
@@ -24,7 +24,7 @@ def focus_vscode_workspace(workspace_env_var: str, verbose: bool = True) -> bool
         return False
     try:
         from .open_vscode_workspace import open_and_focus_workspace
-        success = open_and_focus_workspace(workspace_path, focus=True)
+        success = open_and_focus_workspace(workspace_path, focus=True, verbose=verbose)
         if success and verbose:
             print("  VS Code workspace focused successfully.")
         return success
@@ -134,11 +134,12 @@ class VSCodeCopilot(dspy.BaseLM):
     Uses session-based temporary files to avoid race conditions between tests.
     """
     
-    def __init__(self, workspace_path: str, workspace_env_var: str, polling_timeout: int = 120, **kwargs):
+    def __init__(self, workspace_path: str, workspace_env_var: str, polling_timeout: int = 120, verbose: bool = False, **kwargs):
         super().__init__(model="vscode-copilot", **kwargs)
         self.workspace_path = workspace_path
         self.workspace_env_var = workspace_env_var
         self.polling_timeout = polling_timeout
+        self.verbose = verbose
         # Generate a unique session ID for this model instance
         self.session_id = str(uuid.uuid4())[:8]
         
@@ -261,7 +262,7 @@ class VSCodeCopilot(dspy.BaseLM):
             
             # Also print a concise summary to stdout
             try:
-                print(f"PowerShell + VS Code: {test_case_id}.req.md → {reply_final_path.name} (session: {self.session_id})")
+                print(f"  PowerShell + VS Code: {test_case_id}.req.md → {reply_final_path.name} (session: {self.session_id})")
             except Exception:
                 pass
 
@@ -320,7 +321,7 @@ class VSCodeCopilot(dspy.BaseLM):
 
     def forward(self, prompt: str = None, messages=None, test_case_id: str = None, instruction_files: list = None, task: str = None, **kwargs):
         """Create a request file and execute VS Code with PowerShell command to read it."""
-        focus_vscode_workspace(self.workspace_env_var, verbose=True)
+        focus_vscode_workspace(self.workspace_env_var, verbose=self.verbose)
         
         from types import SimpleNamespace
 
@@ -502,7 +503,7 @@ class VSCodeCopilot(dspy.BaseLM):
         result.answer = answer_content
         return result
 
-def create_model(provider: str, model: str, settings: Dict[str, Any] = None, **kwargs):
+def create_model(provider: str, model: str, settings: Dict[str, Any] = None, verbose: bool = False, **kwargs):
     """
     Factory function to create model instances based on provider.
     
@@ -510,6 +511,7 @@ def create_model(provider: str, model: str, settings: Dict[str, Any] = None, **k
         provider: 'anthropic', 'azure', 'vscode', or 'mock'
         model: Model name/deployment
         settings: Provider-specific settings from targets.yaml
+        verbose: Whether to print verbose output
         **kwargs: Additional model configuration
     
     Returns:
@@ -534,7 +536,7 @@ def create_model(provider: str, model: str, settings: Dict[str, Any] = None, **k
         
         # Extract polling timeout from kwargs, default to 120 seconds
         polling_timeout = kwargs.pop('polling_timeout', 120)
-        return VSCodeCopilot(workspace_path=workspace_path, workspace_env_var=workspace_env_var, polling_timeout=polling_timeout, **kwargs)
+        return VSCodeCopilot(workspace_path=workspace_path, workspace_env_var=workspace_env_var, polling_timeout=polling_timeout, verbose=verbose, **kwargs)
     elif provider == "anthropic":
         # Get environment variable names from target settings
         api_key_var = settings.get('api_key')
@@ -589,7 +591,7 @@ def create_model(provider: str, model: str, settings: Dict[str, Any] = None, **k
     else:
         raise ValueError(f"Unsupported provider: {provider}. Supported: anthropic, azure, vscode, mock")
 
-def configure_dspy_model(provider: str, model: str, settings: Dict[str, Any] = None, **kwargs):
+def configure_dspy_model(provider: str, model: str, settings: Dict[str, Any] = None, verbose: bool = False, **kwargs):
     """
     Configure DSPy with the specified model.
     
@@ -597,7 +599,8 @@ def configure_dspy_model(provider: str, model: str, settings: Dict[str, Any] = N
         provider: Model provider
         model: Model name
         settings: Provider-specific settings
+        verbose: Whether to print verbose output
         **kwargs: Additional configuration
     """
-    model_instance = create_model(provider, model, settings, **kwargs)
+    model_instance = create_model(provider, model, settings, verbose=verbose, **kwargs)
     dspy.settings.configure(lm=model_instance)
