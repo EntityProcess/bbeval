@@ -32,7 +32,7 @@ class QualityGrader(dspy.Signature):
     
     score = dspy.OutputField(desc="A single float score between 0.0 and 1.0.")
     hits = dspy.OutputField(desc="Brief, specific list of what the generated_answer did well or correctly achieved from the expected_outcome.")
-    misses = dspy.OutputField(desc="Brief, specific list of what the generated_answer missed, did incorrectly, or failed to achieve from the expected_outcome.")
+    misses = dspy.OutputField(desc="Brief, specific list of what the generated_answer missed, did incorrectly, or failed to achieve from the expected_outcome. Leave completely empty if there are no significant misses.")
     reasoning = dspy.OutputField(desc="Concise explanation for the score (1-2 sentences max).")
 
 class EvaluationModule(dspy.Module):

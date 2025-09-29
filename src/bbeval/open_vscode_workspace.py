@@ -149,13 +149,14 @@ def focus_vscode_window(workspace_path: Path) -> bool:
     return False
 
 
-def open_and_focus_workspace(workspace_path: str, focus: bool = False) -> bool:
+def open_and_focus_workspace(workspace_path: str, focus: bool = False, verbose: bool = True) -> bool:
     """
     Opens a VS Code workspace and optionally focuses it.
     
     Args:
         workspace_path: Path to the .code-workspace file
         focus: Whether to attempt focusing the window
+        verbose: Whether to print status messages
         
     Returns:
         True if successful, False otherwise
@@ -178,9 +179,11 @@ def open_and_focus_workspace(workspace_path: str, focus: bool = False) -> bool:
                     time.sleep(1.0)
                     focused = focus_vscode_window(ws_path)
                 else:
-                    print("Focus requested but win32 modules not available; skipping focus.", file=sys.stderr)
+                    if verbose:
+                        print("  Focus requested but win32 modules not available; skipping focus.", file=sys.stderr)
             else:
-                print("Focus requested but OS is not Windows; skipping focus.", file=sys.stderr)
+                if verbose:
+                    print("  Focus requested but OS is not Windows; skipping focus.", file=sys.stderr)
         
         return True
 
@@ -223,9 +226,9 @@ def main():
                 if _HAS_WIN32_MODULES:
                     focused = focus_vscode_window(ws_path)
                 else:
-                    print("Focus requested but win32 modules not available; skipping focus.", file=sys.stderr)
+                    print("  Focus requested but win32 modules not available; skipping focus.", file=sys.stderr)
             else:
-                print("Focus requested but OS is not Windows; skipping focus.", file=sys.stderr)
+                print("  Focus requested but OS is not Windows; skipping focus.", file=sys.stderr)
         
         # Emit machine-parseable summary
         result = {

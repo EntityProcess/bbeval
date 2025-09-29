@@ -192,7 +192,8 @@ def _run_test_case_grading(
             prompt_inputs = build_prompt_inputs(test_case, repo_root)
 
             # Run the model prediction with conditional caching
-            print(f"  Running prediction...")
+            if verbose:
+                print(f"  Running prediction...")
             prediction = evaluation_module(
                 test_case_id=test_case.id,
                 request=prompt_inputs.get('request', ''),
@@ -210,7 +211,8 @@ def _run_test_case_grading(
                 # For VSCode provider, we need to temporarily switch to a standard model for judging
                 # to avoid double JSON wrapping and incorrect file naming
                 if provider.lower() == "vscode":
-                    print(f"  Detected VSCode provider, switching to judge model...")
+                    if verbose:
+                        print(f"  Detected VSCode provider, switching to judge model...")
                     # Save current model
                     original_lm = dspy.settings.lm
                     
@@ -218,7 +220,8 @@ def _run_test_case_grading(
                     try:
                         judge_model = create_judge_model(target, targets, model, verbose)
                         dspy.settings.configure(lm=judge_model)
-                        print(f"  Successfully switched to judge model for LLM judging...")
+                        if verbose:
+                            print(f"  Successfully switched to judge model for LLM judging...")
                         
                         llm_judge = dspy.Predict(QualityGrader)
                         judgement = llm_judge(
@@ -251,7 +254,8 @@ def _run_test_case_grading(
                         grader_prompt_content = last_interaction.get('prompt') or last_interaction.get('messages')
                     finally:
                         # Restore original model
-                        print(f"  Restoring original VSCode model...")
+                        if verbose:
+                            print(f"  Restoring original VSCode model...")
                         dspy.settings.configure(lm=original_lm)
                 else:
                     llm_judge = dspy.Predict(QualityGrader)
@@ -277,12 +281,22 @@ def _run_test_case_grading(
                         hits = [judgement.hits]  # Convert single string to list
                 if hasattr(judgement, 'misses') and judgement.misses:
                     if isinstance(judgement.misses, list):
-                        misses = judgement.misses
+                        raw_misses = judgement.misses
                     else:
-                        misses = [judgement.misses]  # Convert single string to list
+                        raw_misses = [judgement.misses]  # Convert single string to list
+                    
+                    # Filter out empty responses and "None" responses as a safety net
+                    misses = []
+                    for miss in raw_misses:
+                        if miss and miss.strip() and not (miss.strip().startswith('- None') or miss.strip().lower() == 'none'):
+                            misses.append(miss)
                 
                 # Get reasoning if available
                 reasoning = getattr(judgement, 'reasoning', None)
+                
+                # Extract aspects from expected response to calculate correct aspect count (like heuristic grader)
+                from .grading import extract_aspects
+                expected_aspects = extract_aspects(test_case.expected_assistant_raw)
                 
                 result = EvaluationResult(
                     test_id=test_case.id,
@@ -290,7 +304,7 @@ def _run_test_case_grading(
                     hits=hits,
                     misses=misses,
                     model_answer=candidate_response,
-                    expected_aspect_count=len(hits) + len(misses) if (hits or misses) else 1,
+                    expected_aspect_count=len(expected_aspects),
                     target=target['name'],
                     timestamp=datetime.now(timezone.utc).isoformat(),
                     reasoning=reasoning,
@@ -308,7 +322,11 @@ def _run_test_case_grading(
                 except Exception:
                     pass
 
-            print(f"  Score: {result.score:.2f} ({result.hit_count}/{result.expected_aspect_count} aspects)")
+            # Display score with appropriate context based on grader type
+            if test_case.grader == 'llm_judge':
+                print(f"  Score: {result.score:.2f} (LLM Judge)")
+            else:
+                print(f"  Score: {result.score:.2f} ({result.hit_count}/{result.expected_aspect_count} aspects)")
             
             # Write result immediately if output file specified
             if output_file:
@@ -414,9 +432,11 @@ def run_evaluation(test_file: str,
     """
     repo_root = get_repo_root()
     
-    print(f"Loading test cases from: {test_file}")
+    if verbose:
+        print(f"Loading test cases from: {test_file}")
     test_cases = load_testcases(test_file, repo_root)
-    print(f"Loaded {len(test_cases)} test cases")
+    if verbose:
+        print(f"Loaded {len(test_cases)} test cases")
     
     # Filter to specific test ID if provided
     if test_id:
@@ -443,13 +463,14 @@ def run_evaluation(test_file: str,
     # Configure model
     if dry_run:
         print("Running in dry-run mode with mock model")
-        configure_dspy_model("mock", "mock-model")
+        configure_dspy_model("mock", "mock-model", verbose=verbose)
         provider = "mock"
         model = "mock-model"
         # Create a mock target for dry runs
         target = {'name': f"{target['name']}-mock", 'provider': 'mock'}
     else:
-        print(f"Configuring {provider} target: {target['name']}")
+        if verbose:
+            print(f"Configuring {provider} target: {target['name']}")
         
         try:
             # Set DSPy global cache policy first
@@ -467,7 +488,7 @@ def run_evaluation(test_file: str,
                     pass
 
             # Configure the LM, passing disable_cache to ensure LM-level cache is off
-            configure_dspy_model(provider, model, settings, polling_timeout=agent_timeout, disable_cache=(not use_cache))
+            configure_dspy_model(provider, model, settings, verbose=verbose, polling_timeout=agent_timeout, disable_cache=(not use_cache))
         except ValueError as e:
             print(f"Error configuring target: {e}")
             if verbose:
@@ -484,7 +505,8 @@ def run_evaluation(test_file: str,
 
         # Always use unified QuerySignature
         evaluation_module = EvaluationModule(signature_class=QuerySignature)
-        print(f"  Using signature: QuerySignature")
+        if verbose:
+            print(f"  Using signature: QuerySignature")
 
         result = _run_test_case_grading(
             test_case=test_case,
@@ -646,21 +668,25 @@ def main():
     if target_name_from_cli != 'default':
         # CLI override provided (not the default sentinel)
         final_target_name = target_name_from_cli
-        print(f"Using target from --target flag: {final_target_name}")
+        target_source = "CLI flag"
     elif target_name_from_file:
         # Use target from YAML file
         final_target_name = target_name_from_file
-        print(f"Using target from test file: {final_target_name}")
+        target_source = "test file"
     else:
         # Fall back to 'default' target (original behavior)
         final_target_name = 'default'
-        print(f"Using default target: {final_target_name}")
+        target_source = "default"
 
     # Load targets and locate the chosen target configuration
     try:
         targets = load_targets(args.targets)
         target = find_target(final_target_name, targets)
-        print(f"Using target: {target['name']} (provider: {target['provider']})")
+        
+        if args.verbose:
+            print(f"Using target from {target_source}: {target['name']} (provider: {target['provider']})")
+        else:
+            print(f"Using target: {target['name']} (provider: {target['provider']})")
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}")
         sys.exit(1)
@@ -668,7 +694,7 @@ def main():
     # Set default output file if not specified
     if not args.output_file:
         args.output_file = get_default_output_path(args.test_file)
-        print(f"No output file specified, defaulting to: {args.output_file}")
+        print(f"Output: {args.output_file}")
     
     # Create output directory if specified
     if args.output_file:
