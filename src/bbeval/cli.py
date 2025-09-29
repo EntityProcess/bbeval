@@ -277,12 +277,22 @@ def _run_test_case_grading(
                         hits = [judgement.hits]  # Convert single string to list
                 if hasattr(judgement, 'misses') and judgement.misses:
                     if isinstance(judgement.misses, list):
-                        misses = judgement.misses
+                        raw_misses = judgement.misses
                     else:
-                        misses = [judgement.misses]  # Convert single string to list
+                        raw_misses = [judgement.misses]  # Convert single string to list
+                    
+                    # Filter out empty responses and "None" responses as a safety net
+                    misses = []
+                    for miss in raw_misses:
+                        if miss and miss.strip() and not (miss.strip().startswith('- None') or miss.strip().lower() == 'none'):
+                            misses.append(miss)
                 
                 # Get reasoning if available
                 reasoning = getattr(judgement, 'reasoning', None)
+                
+                # Extract aspects from expected response to calculate correct aspect count (like heuristic grader)
+                from .grading import extract_aspects
+                expected_aspects = extract_aspects(test_case.expected_assistant_raw)
                 
                 result = EvaluationResult(
                     test_id=test_case.id,
@@ -290,7 +300,7 @@ def _run_test_case_grading(
                     hits=hits,
                     misses=misses,
                     model_answer=candidate_response,
-                    expected_aspect_count=len(hits) + len(misses) if (hits or misses) else 1,
+                    expected_aspect_count=len(expected_aspects),
                     target=target['name'],
                     timestamp=datetime.now(timezone.utc).isoformat(),
                     reasoning=reasoning,
@@ -308,7 +318,11 @@ def _run_test_case_grading(
                 except Exception:
                     pass
 
-            print(f"  Score: {result.score:.2f} ({result.hit_count}/{result.expected_aspect_count} aspects)")
+            # Display score with appropriate context based on grader type
+            if test_case.grader == 'llm_judge':
+                print(f"  Score: {result.score:.2f} (LLM Judge)")
+            else:
+                print(f"  Score: {result.score:.2f} ({result.hit_count}/{result.expected_aspect_count} aspects)")
             
             # Write result immediately if output file specified
             if output_file:
