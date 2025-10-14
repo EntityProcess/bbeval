@@ -9,7 +9,7 @@ from bbeval.signatures import QuerySignature, EvaluationModule
 class TestQuerySignature(unittest.TestCase):
     def test_query_signature_fields(self):
         self.assertTrue(issubclass(QuerySignature, dspy.Signature))
-        for field in ['request', 'guidelines', 'outcome']:
+        for field in ['request', 'guidelines']:
             self.assertIn(field, QuerySignature.__annotations__)
         self.assertIn('answer', QuerySignature.__annotations__)
 

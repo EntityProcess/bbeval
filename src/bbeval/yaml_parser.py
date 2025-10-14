@@ -101,7 +101,8 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
                                 # Check if this is an instruction or prompt file
                                 if is_guideline_file(file_path):
                                     # This is a guideline file - add to guideline paths but not to user segments
-                                    guideline_paths.append(file_path)
+                                    # Store the absolute path to avoid resolution issues later
+                                    guideline_paths.append(str(full_path))
                                 else:
                                     # This is a regular file - add to user segments
                                     user_segments.append({

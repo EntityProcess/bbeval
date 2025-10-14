@@ -164,8 +164,11 @@ class VSCodeCopilot(dspy.BaseLM):
         file_list = []
         token_list = []
         for i, instruction_file in enumerate(instruction_files, 1):
-            file_name = instruction_file.split('/')[-1]  # Get just the filename
-            file_list.append(f"`#file:{instruction_file}`")
+            # instruction_file is already an absolute path from yaml_parser
+            abs_path = Path(instruction_file)
+            file_name = abs_path.name  # Get just the filename
+            file_uri = abs_path.as_uri()
+            file_list.append(f"[{file_name}]({file_uri})")
             token_list.append(f"INSTRUCTIONS_READ: [{file_name}](http://_vscodecontentref_/{i}) SHA256=<hex>")
         
         # Create single consolidated pre-read instruction
@@ -184,7 +187,7 @@ class VSCodeCopilot(dspy.BaseLM):
             f"If any file is missing, fail with ERROR: missing-file <filename> and stop."
         )
         
-        return f"## 1. Mandatory Pre-Read\n\n{consolidated_instruction}\n\n"
+        return f"[[ ## mandatory_pre_read ## ]]\n\n{consolidated_instruction}\n\n"
     
     def _prepare_session_files(self, test_case_id: str) -> Tuple[Path, Path, Path, Path]:
         """
@@ -337,7 +340,7 @@ class VSCodeCopilot(dspy.BaseLM):
                 final_prompt += self._build_mandatory_preread_block(instruction_files)
             
             # Section 2: Add the task with clear header
-            final_prompt += "## 2. Task\n\n"
+            final_prompt += "[[ ## task ## ]]\n\n"
             final_prompt += task + "\n\n"
             
             # Use the clean final prompt instead of the complex structure
@@ -349,7 +352,7 @@ class VSCodeCopilot(dspy.BaseLM):
         # Create the request file content with file handling instructions
         enhanced_prompt = (
             f"{(actual_prompt or '').strip()}\n\n"
-            f"## 3. Output Instructions\n\n"
+            f"[[ ## output_instructions ## ]]\n\n"
             f"**IMPORTANT**: Follow these exact steps:\n"
             f"1. Write your complete response to: {reply_tmp_path.resolve()}\n"
             f"2. When completely finished, run this PowerShell command to signal completion:\n"

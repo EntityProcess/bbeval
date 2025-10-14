@@ -43,27 +43,33 @@ class TestVSCodeCopilotHelpers(unittest.TestCase):
     
     def test_build_mandatory_preread_block_single_file(self):
         """Test building preread block with a single instruction file."""
-        instruction_files = ["/path/to/file1.instructions.md"]
+        # Use an absolute path that matches what yaml_parser would provide
+        instruction_files = [str(Path("/path/to/file1.instructions.md").resolve())]
         result = self.vscode_copilot._build_mandatory_preread_block(instruction_files)
         
-        self.assertIn("## 1. Mandatory Pre-Read", result)
-        self.assertIn("`#file:/path/to/file1.instructions.md`", result)
+        self.assertIn("## mandatory_pre_read ##", result)
+        self.assertIn("file1.instructions.md", result)
         self.assertIn("INSTRUCTIONS_READ: [file1.instructions.md]", result)
         self.assertIn("SHA256=<hex>", result)
+        # Should contain a file:/// URI
+        self.assertIn("file://", result)
     
     def test_build_mandatory_preread_block_multiple_files(self):
         """Test building preread block with multiple instruction files."""
+        # Use absolute paths that match what yaml_parser would provide
         instruction_files = [
-            "/path/to/file1.instructions.md",
-            "/path/to/file2.instructions.md"
+            str(Path("/path/to/file1.instructions.md").resolve()),
+            str(Path("/path/to/file2.instructions.md").resolve())
         ]
         result = self.vscode_copilot._build_mandatory_preread_block(instruction_files)
         
-        self.assertIn("## 1. Mandatory Pre-Read", result)
-        self.assertIn("`#file:/path/to/file1.instructions.md`", result)
-        self.assertIn("`#file:/path/to/file2.instructions.md`", result)
+        self.assertIn("## mandatory_pre_read ##", result)
+        self.assertIn("file1.instructions.md", result)
+        self.assertIn("file2.instructions.md", result)
         self.assertIn("INSTRUCTIONS_READ: [file1.instructions.md]", result)
         self.assertIn("INSTRUCTIONS_READ: [file2.instructions.md]", result)
+        # Should contain file:/// URIs
+        self.assertIn("file://", result)
     
     def test_prepare_session_files(self):
         """Test session file preparation."""
@@ -127,6 +133,48 @@ class TestVSCodeCopilotHelpers(unittest.TestCase):
             self.vscode_copilot._execute_vscode_command_and_poll(
                 request_file, reply_final, reply_tmp, session_dir, "test"
             )
+    
+    def test_absolute_path_not_duplicated(self):
+        """Test that absolute paths are not resolved again, avoiding path duplication."""
+        # Create a real temporary directory structure that mimics the issue
+        temp_root = Path(self.temp_dir) / "docs" / "examples" / "simple"
+        temp_root.mkdir(parents=True, exist_ok=True)
+        
+        prompts_dir = temp_root / "prompts"
+        prompts_dir.mkdir(exist_ok=True)
+        
+        instruction_file = prompts_dir / "python.instructions.md"
+        instruction_file.write_text("# Python Instructions")
+        
+        # This is what yaml_parser now provides - an absolute path
+        instruction_files = [str(instruction_file)]
+        
+        # Build the preread block
+        result = self.vscode_copilot._build_mandatory_preread_block(instruction_files)
+        
+        # Verify the path appears correctly in the file URI
+        # The path should NOT be duplicated like:
+        # file:///D:/GitHub/christso/bbeval/docs/examples/simple/docs/examples/simple/prompts/python.instructions.md
+        
+        # Count how many times "prompts" appears in the result
+        prompts_count = result.count("prompts")
+        # It should appear once in the file URI
+        self.assertGreaterEqual(prompts_count, 1, "prompts directory should appear in the URI")
+        
+        # Verify the file URI doesn't contain duplicated path segments
+        # Extract the file URI from the result
+        import re
+        uri_pattern = r'file://[^\)]+\.instructions\.md'
+        uris = re.findall(uri_pattern, result)
+        self.assertGreater(len(uris), 0, "Should find at least one file URI")
+        
+        for uri in uris:
+            # Check that path segments aren't duplicated
+            # e.g., we shouldn't see "simple/docs/examples/simple"
+            self.assertNotIn("simple/docs/examples/simple", uri, 
+                           f"Path should not be duplicated in URI: {uri}")
+            # Check that it points to a valid path format
+            self.assertIn("python.instructions.md", uri)
 
 
 if __name__ == '__main__':
