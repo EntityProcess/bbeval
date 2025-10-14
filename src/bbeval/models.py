@@ -169,22 +169,21 @@ class VSCodeCopilot(dspy.BaseLM):
             file_name = abs_path.name  # Get just the filename
             file_uri = abs_path.as_uri()
             file_list.append(f"[{file_name}]({file_uri})")
-            token_list.append(f"INSTRUCTIONS_READ: [{file_name}](http://_vscodecontentref_/{i}) SHA256=<hex>")
+            token_list.append(f"INSTRUCTIONS_READ: `{file_name}` i={i} SHA256=<hex>")
         
         # Create single consolidated pre-read instruction
         files_text = ", ".join(file_list)
         tokens_text = "\n".join(token_list)
         
         consolidated_instruction = (
-            f"**MANDATORY STEP — PRE-READ ALL INSTRUCTIONS**: Before any analysis, open and read all instruction files: {files_text}. "
-            f"Locate each file using its filename or an explicit filesystem path (do not rely on a workspace text search). "
+            f"Read all instruction files: {files_text}. "
             f"After reading each file, compute its SHA256 hash using this PowerShell command: "
             f"`Get-FileHash -Algorithm SHA256 -LiteralPath '<file-path>' | Select-Object -ExpandProperty Hash`. "
             f"Then include, at the top of your reply, these exact tokens on separate lines:\n\n"
             f"{tokens_text}\n\n"
             f"Replace `<hex>` with the actual SHA256 hash value computed from the PowerShell command. "
-            f"Follow each token with a one-paragraph summary of the specific rules applied from that file. "
-            f"If any file is missing, fail with ERROR: missing-file <filename> and stop."
+            f"If any file is missing, fail with ERROR: missing-file <filename> and stop.\n\n"
+            f"Then fetch all documentation required by the instructions before proceeding with your task."
         )
         
         return f"[[ ## mandatory_pre_read ## ]]\n\n{consolidated_instruction}\n\n"
