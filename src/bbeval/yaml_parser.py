@@ -49,6 +49,27 @@ def load_testcases(test_file_path: str, repo_root: Path, verbose: bool = False) 
     test_path = Path(test_file_path)
     if not test_path.exists():
         raise FileNotFoundError(f"Test file not found: {test_file_path}")
+    # Work with absolute paths for consistent resolution
+    test_path = test_path.resolve()
+    repo_root = repo_root.resolve()
+    cwd_path = Path.cwd().resolve()
+
+    # Build a search order for resolving relative file references. We start from the
+    # directory containing the test file, walk up towards the repository root, and
+    # finally fall back to the current working directory for backwards compatibility.
+    search_roots = []
+    current_dir = test_path.parent
+    while True:
+        if current_dir not in search_roots:
+            search_roots.append(current_dir)
+        if current_dir == repo_root or current_dir.parent == current_dir:
+            break
+        current_dir = current_dir.parent
+
+    if repo_root not in search_roots:
+        search_roots.append(repo_root)
+    if cwd_path not in search_roots:
+        search_roots.append(cwd_path)
     
     with open(test_path, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
@@ -90,64 +111,70 @@ def load_testcases(test_file_path: str, repo_root: Path, verbose: bool = False) 
             elif isinstance(content, list):
                 for segment in content:
                     if segment.get('type') == 'file':
-                        # Read file content
-                        file_path = segment['value'].lstrip('/')
-                        
-                        # Try multiple locations to find the file:
-                        # 1. As absolute path if the original path was absolute
-                        # 2. Relative to test file's directory
-                        # 3. Relative to repo root (git repository root)
-                        # 4. Relative to current working directory (where bbeval command was run)
+                        raw_value = segment.get('value')
+                        if not raw_value:
+                            continue
+
+                        file_path_display = raw_value.lstrip('/\\') or raw_value
+                        original_path = Path(raw_value)
+                        relative_path = Path(file_path_display)
+
+                        # Assemble candidate locations in priority order.
                         potential_paths = []
-                        
-                        # If the original value was an absolute path, try it as-is
-                        if Path(segment['value']).is_absolute():
-                            potential_paths.append(Path(segment['value']))
-                        
-                        # Add test file directory (NEW: most specific context)
-                        potential_paths.append(test_path.parent / file_path)
-                        
-                        # Add repo root
-                        potential_paths.append(repo_root / file_path)
-                        
-                        # Add current working directory
-                        potential_paths.append(Path.cwd() / file_path)
-                        
+                        if original_path.is_absolute():
+                            potential_paths.append(original_path)
+
+                        for base_dir in search_roots:
+                            potential_paths.append(base_dir / relative_path)
+
                         full_path = None
+                        attempted_paths = []
+                        seen_candidates = set()
+
                         for candidate in potential_paths:
-                            if candidate.exists():
-                                full_path = candidate
+                            try:
+                                resolved_candidate = candidate.resolve(strict=False)
+                            except Exception:
+                                resolved_candidate = candidate
+
+                            if resolved_candidate in seen_candidates:
+                                continue
+                            seen_candidates.add(resolved_candidate)
+                            attempted_paths.append(resolved_candidate)
+
+                            if resolved_candidate.exists():
+                                full_path = resolved_candidate
                                 break
-                        
+
                         if full_path:
                             try:
                                 with open(full_path, 'r', encoding='utf-8') as f:
                                     file_content = f.read()
                                 
                                 # Check if this is an instruction or prompt file
-                                if is_guideline_file(file_path):
+                                if is_guideline_file(file_path_display):
                                     # This is a guideline file - add to guideline paths but not to user segments
                                     # Store the absolute path to avoid resolution issues later
-                                    guideline_paths.append(str(full_path))
+                                    guideline_paths.append(str(full_path.resolve()))
                                     if verbose:
-                                        print(f"  [Guideline] Found: {file_path}")
+                                        print(f"  [Guideline] Found: {file_path_display}")
                                         print(f"    Resolved to: {full_path}")
                                 else:
                                     # This is a regular file - add to user segments
                                     user_segments.append({
                                         'type': 'file',
-                                        'path': file_path,
+                                        'path': file_path_display,
                                         'text': file_content
                                     })
                                     if verbose:
-                                        print(f"  [File] Found: {file_path}")
+                                        print(f"  [File] Found: {file_path_display}")
                                         print(f"    Resolved to: {full_path}")
                             except Exception as e:
                                 print(f"\033[33mWarning: Could not read file {full_path}: {e}\033[0m")
                         else:
                             # Show all attempted paths for better debugging
-                            attempted = "\n    ".join(str(p) for p in potential_paths)
-                            print(f"\033[33mWarning: File not found: {file_path}")
+                            attempted = "\n    ".join(str(p) for p in attempted_paths)
+                            print(f"\033[33mWarning: File not found: {file_path_display}")
                             print(f"  Tried:\n    {attempted}\033[0m")
                     else:
                         # Handle text or other segment types

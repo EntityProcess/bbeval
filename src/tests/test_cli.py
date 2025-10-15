@@ -8,6 +8,9 @@ Tests the CLI helper functions for improved modularity.
 import unittest
 from unittest.mock import Mock, patch
 import io
+import json
+import tempfile
+from pathlib import Path
 
 from bbeval import EvaluationResult
 from bbeval.models import AgentTimeoutError
@@ -209,6 +212,51 @@ class TestRunTestCaseWithRetries(unittest.TestCase):
         self.assertEqual(result.hits, ["Good error handling"])
         self.assertEqual(result.misses, [])
         self.assertIsNotNone(result.grader_raw_request)  # Raw request captured for debugging
+
+    @patch('bbeval.cli.build_prompt_inputs')
+    @patch('bbeval.cli.grade_test_case_heuristic')
+    def test_prompt_dump_directory(self, mock_evaluate, mock_build_prompt):
+        """Ensure prompt payloads are written when dump directory is provided."""
+        mock_build_prompt.return_value = {"request": "req", "guidelines": "guides"}
+        mock_evaluate.return_value = EvaluationResult(
+            test_id="test_case_123",
+            score=1.0,
+            hits=["hit"],
+            misses=[],
+            model_answer="answer",
+            expected_aspect_count=1,
+            target="test_target",
+            timestamp="",
+            raw_aspects=[]
+        )
+
+        self.test_case.guideline_paths = ["/tmp/guide.md"]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dump_path = Path(tmpdir)
+            _run_test_case_grading(
+                test_case=self.test_case,
+                evaluation_module=self.evaluation_module,
+                repo_root="/test/repo",
+                provider="test",
+                settings={},
+                model="test-model",
+                output_file=None,
+                dry_run=False,
+                verbose=True,
+                max_retries=0,
+                target=self.target,
+                targets=self.targets,
+                prompt_dump_dir=dump_path
+            )
+
+            dumped_files = list(dump_path.glob("*.json"))
+            self.assertTrue(dumped_files, "Expected prompt dump file to be created")
+            payload = json.loads(dumped_files[0].read_text())
+            self.assertEqual(payload["test_id"], self.test_case.id)
+            self.assertEqual(payload["request"], "req")
+            self.assertEqual(payload["guidelines"], "guides")
+            self.assertEqual(payload["guideline_paths"], self.test_case.guideline_paths)
 
 
 class TestTargetSelection(unittest.TestCase):

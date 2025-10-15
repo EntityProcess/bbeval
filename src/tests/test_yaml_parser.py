@@ -255,6 +255,103 @@ class TestYamlParser(unittest.TestCase):
         self.assertEqual(len(file_segments), 1)
         self.assertEqual(file_segments[0]['path'], 'files/code.py')
 
+    def test_guideline_resolution_from_nested_eval_directory(self):
+        """Guidelines referenced with leading slash should resolve from test directory ancestors."""
+        workspace_root = self.repo_root / "nested" / "simple"
+        evals_dir = workspace_root / "evals"
+        prompts_dir = workspace_root / "prompts"
+        evals_dir.mkdir(parents=True)
+        prompts_dir.mkdir(parents=True)
+
+        nested_instruction = prompts_dir / "nested.instructions.md"
+        nested_instruction.write_text("# Nested Instructions")
+
+        test_yaml_content = {
+            'testcases': [
+                {
+                    'id': 'nested-case',
+                    'outcome': 'Follow nested instructions.',
+                    'messages': [
+                        {
+                            'role': 'user',
+                            'content': [
+                                {'type': 'file', 'value': '/prompts/nested.instructions.md'},
+                            ]
+                        },
+                        {
+                            'role': 'assistant',
+                            'content': 'Done.'
+                        }
+                    ]
+                }
+            ]
+        }
+
+        test_yaml_path = evals_dir / "nested.test.yaml"
+        with open(test_yaml_path, 'w') as f:
+            yaml.dump(test_yaml_content, f)
+
+        original_cwd = os.getcwd()
+        try:
+            # Simulate running from repo root rather than nested directory
+            os.chdir(self.repo_root)
+            test_cases = load_testcases(str(test_yaml_path), self.repo_root)
+        finally:
+            os.chdir(original_cwd)
+
+        self.assertEqual(len(test_cases), 1)
+        guideline_path = Path(test_cases[0].guideline_paths[0])
+        self.assertEqual(guideline_path, nested_instruction.resolve())
+        self.assertTrue(guideline_path.exists())
+
+    def test_guideline_resolution_with_repo_relative_path(self):
+        """Guidelines with repo-relative prefixes should resolve correctly."""
+        example_root = self.repo_root / "docs" / "examples" / "simple"
+        evals_dir = example_root / "evals"
+        prompts_dir = example_root / "prompts"
+        evals_dir.mkdir(parents=True)
+        prompts_dir.mkdir(parents=True)
+
+        example_instruction = prompts_dir / "example.instructions.md"
+        example_instruction.write_text("# Example Instructions")
+
+        test_yaml_content = {
+            'testcases': [
+                {
+                    'id': 'repo-relative-case',
+                    'outcome': 'Follow repo relative instructions.',
+                    'messages': [
+                        {
+                            'role': 'user',
+                            'content': [
+                                {'type': 'file', 'value': '/docs/examples/simple/prompts/example.instructions.md'},
+                            ]
+                        },
+                        {
+                            'role': 'assistant',
+                            'content': 'Done.'
+                        }
+                    ]
+                }
+            ]
+        }
+
+        test_yaml_path = evals_dir / "repo-relative.test.yaml"
+        with open(test_yaml_path, 'w') as f:
+            yaml.dump(test_yaml_content, f)
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(evals_dir)
+            test_cases = load_testcases(str(test_yaml_path), self.repo_root)
+        finally:
+            os.chdir(original_cwd)
+
+        self.assertEqual(len(test_cases), 1)
+        guideline_path = Path(test_cases[0].guideline_paths[0])
+        self.assertEqual(guideline_path, example_instruction.resolve())
+        self.assertTrue(guideline_path.exists())
+
 
 if __name__ == '__main__':
     unittest.main()
