@@ -434,7 +434,7 @@ def run_evaluation(test_file: str,
     
     if verbose:
         print(f"Loading test cases from: {test_file}")
-    test_cases = load_testcases(test_file, repo_root)
+    test_cases = load_testcases(test_file, repo_root, verbose=verbose)
     if verbose:
         print(f"Loaded {len(test_cases)} test cases")
     
@@ -444,7 +444,7 @@ def run_evaluation(test_file: str,
         test_cases = [tc for tc in test_cases if tc.id == test_id]
         if not test_cases:
             print(f"Error: Test case with ID '{test_id}' not found")
-            print(f"Available test IDs: {[tc.id for tc in load_testcases(test_file, repo_root)]}")
+            print(f"Available test IDs: {[tc.id for tc in load_testcases(test_file, repo_root, verbose=False)]}")
             return []
         print(f"Filtered to test case: {test_id} (1 of {original_count} total)")
     

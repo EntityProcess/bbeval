@@ -34,13 +34,14 @@ def extract_code_blocks(segments: List[dict]) -> List[str]:
     return code_blocks
 
 
-def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
+def load_testcases(test_file_path: str, repo_root: Path, verbose: bool = False) -> List[TestCase]:
     """
     Load test cases from a YAML file.
     
     Args:
         test_file_path: Path to the .test.yaml file
         repo_root: Root directory of the repository for resolving file paths
+        verbose: Whether to print verbose logging about file resolution
     
     Returns:
         List of TestCase objects
@@ -91,9 +92,34 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
                     if segment.get('type') == 'file':
                         # Read file content
                         file_path = segment['value'].lstrip('/')
-                        full_path = repo_root / file_path
                         
-                        if full_path.exists():
+                        # Try multiple locations to find the file:
+                        # 1. As absolute path if the original path was absolute
+                        # 2. Relative to test file's directory
+                        # 3. Relative to repo root (git repository root)
+                        # 4. Relative to current working directory (where bbeval command was run)
+                        potential_paths = []
+                        
+                        # If the original value was an absolute path, try it as-is
+                        if Path(segment['value']).is_absolute():
+                            potential_paths.append(Path(segment['value']))
+                        
+                        # Add test file directory (NEW: most specific context)
+                        potential_paths.append(test_path.parent / file_path)
+                        
+                        # Add repo root
+                        potential_paths.append(repo_root / file_path)
+                        
+                        # Add current working directory
+                        potential_paths.append(Path.cwd() / file_path)
+                        
+                        full_path = None
+                        for candidate in potential_paths:
+                            if candidate.exists():
+                                full_path = candidate
+                                break
+                        
+                        if full_path:
                             try:
                                 with open(full_path, 'r', encoding='utf-8') as f:
                                     file_content = f.read()
@@ -103,6 +129,9 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
                                     # This is a guideline file - add to guideline paths but not to user segments
                                     # Store the absolute path to avoid resolution issues later
                                     guideline_paths.append(str(full_path))
+                                    if verbose:
+                                        print(f"  [Guideline] Found: {file_path}")
+                                        print(f"    Resolved to: {full_path}")
                                 else:
                                     # This is a regular file - add to user segments
                                     user_segments.append({
@@ -110,10 +139,16 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
                                         'path': file_path,
                                         'text': file_content
                                     })
+                                    if verbose:
+                                        print(f"  [File] Found: {file_path}")
+                                        print(f"    Resolved to: {full_path}")
                             except Exception as e:
                                 print(f"\033[33mWarning: Could not read file {full_path}: {e}\033[0m")
                         else:
-                            print(f"\033[33mWarning: File not found: {full_path}\033[0m")
+                            # Show all attempted paths for better debugging
+                            attempted = "\n    ".join(str(p) for p in potential_paths)
+                            print(f"\033[33mWarning: File not found: {file_path}")
+                            print(f"  Tried:\n    {attempted}\033[0m")
                     else:
                         # Handle text or other segment types
                         user_segments.append(segment)
@@ -148,6 +183,15 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
             grader=raw_test.get('grader', global_grader)  # Use test-specific grader or global default
         )
         
+        if verbose:
+            print(f"\n[Test Case: {raw_test['id']}]")
+            if guideline_paths:
+                print(f"  Guidelines used: {len(guideline_paths)}")
+                for gp in guideline_paths:
+                    print(f"    - {gp}")
+            else:
+                print(f"  No guidelines found")
+        
         test_cases.append(test_case)
     
     return test_cases
@@ -163,11 +207,13 @@ def build_prompt_inputs(test_case: TestCase, repo_root: Path) -> dict:
     # Gather guidelines content
     guideline_contents = []
     for path in test_case.guideline_paths:
-        full_path = repo_root / path
+        # Guideline paths are now stored as absolute paths, use them directly
+        full_path = Path(path)
         if full_path.exists():
             try:
                 with open(full_path, 'r', encoding='utf-8') as f:
-                    guideline_contents.append(f"=== {path} ===\n{f.read()}")
+                    # Use just the filename for the header
+                    guideline_contents.append(f"=== {full_path.name} ===\n{f.read()}")
             except Exception as e:
                 print(f"\033[33mWarning: Could not read guideline file {full_path}: {e}\033[0m")
 
