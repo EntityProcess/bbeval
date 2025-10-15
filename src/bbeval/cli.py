@@ -1,5 +1,5 @@
 """
-Command Line Interface for Bbeval
+Command Line Interface for BbEval
 
 Provides CLI for running evaluations against test YAML files with
 support for multiple model providers and configuration via execution targets.
@@ -638,7 +638,7 @@ def main():
     except metadata.PackageNotFoundError:
         __version__ = "0.0.0-dev"
 
-    parser = argparse.ArgumentParser(description="Bbeval")
+    parser = argparse.ArgumentParser(description="BbEval")
     parser.add_argument(
         '--version',
         action='version',

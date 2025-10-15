@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quick diagnostic script to verify the Bbeval works
+Quick diagnostic script to verify the BbEval works
 without external dependencies.
 """
 
