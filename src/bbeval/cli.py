@@ -1,5 +1,5 @@
 """
-Command Line Interface for Bbeval
+Command Line Interface for BbEval
 
 Provides CLI for running evaluations against test YAML files with
 support for multiple model providers and configuration via execution targets.
@@ -8,10 +8,11 @@ support for multiple model providers and configuration via execution targets.
 import argparse
 import json
 import os
+import re
 import sys
 import yaml
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 import statistics
 from datetime import datetime, timezone
 import dspy
@@ -146,6 +147,35 @@ def get_default_output_path(test_file: str) -> str:
     return str(results_dir / output_filename)
 
 
+def _sanitize_for_filename(value: str) -> str:
+    """Sanitize arbitrary strings for safe filename usage."""
+    if not value:
+        return "prompt"
+    sanitized = re.sub(r'[^A-Za-z0-9._-]+', '_', value)
+    return sanitized or "prompt"
+
+
+def _dump_prompt_inputs(dump_dir: Path, test_case, prompt_inputs: Dict[str, str], verbose: bool = False) -> None:
+    """Persist the prompt inputs sent to the model for debugging."""
+    try:
+        dump_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{timestamp}_{_sanitize_for_filename(getattr(test_case, 'id', 'test'))}.json"
+        dump_path = dump_dir / filename
+        payload = {
+            "test_id": getattr(test_case, 'id', None),
+            "request": prompt_inputs.get('request'),
+            "guidelines": prompt_inputs.get('guidelines'),
+            "guideline_paths": getattr(test_case, 'guideline_paths', []),
+        }
+        with open(dump_path, 'w', encoding='utf-8') as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+        if verbose:
+            print(f"  Prompt dump written to: {dump_path}")
+    except Exception as exc:
+        print(f"\033[33mWarning: Failed to dump prompt inputs for {getattr(test_case, 'id', 'unknown')}: {exc}\033[0m")
+
+
 def _run_test_case_grading(
     test_case,
     evaluation_module,
@@ -158,7 +188,8 @@ def _run_test_case_grading(
     verbose: bool,
     max_retries: int,
     target: Dict,
-    targets: List[Dict]
+    targets: List[Dict],
+    prompt_dump_dir: Optional[Path] = None
 ) -> EvaluationResult:
     """
     Execute a single test case with retry logic and conditional judging.
@@ -190,6 +221,9 @@ def _run_test_case_grading(
         try:
             # Build prompt inputs (request + guidelines)
             prompt_inputs = build_prompt_inputs(test_case, repo_root)
+
+            if prompt_dump_dir is not None:
+                _dump_prompt_inputs(prompt_dump_dir, test_case, prompt_inputs, verbose)
 
             # Run the model prediction with conditional caching
             if verbose:
@@ -412,7 +446,8 @@ def run_evaluation(test_file: str,
                   test_id: str = None,
                   agent_timeout: int = 120,
                   max_retries: int = 2,
-                  use_cache: bool = False) -> List[EvaluationResult]:
+                  use_cache: bool = False,
+                  prompt_dump_dir: Optional[Path] = None) -> List[EvaluationResult]:
     """
     Run evaluation on a test file using the specified target.
     
@@ -426,6 +461,7 @@ def run_evaluation(test_file: str,
         agent_timeout: Timeout in seconds for agent response polling
         max_retries: Maximum number of retries for timeout cases
         use_cache: Whether to enable DSPy caching for LLM responses
+        prompt_dump_dir: Optional directory to persist prompt payloads for debugging
     
     Returns:
         List of evaluation results
@@ -434,7 +470,7 @@ def run_evaluation(test_file: str,
     
     if verbose:
         print(f"Loading test cases from: {test_file}")
-    test_cases = load_testcases(test_file, repo_root)
+    test_cases = load_testcases(test_file, repo_root, verbose=verbose)
     if verbose:
         print(f"Loaded {len(test_cases)} test cases")
     
@@ -444,7 +480,7 @@ def run_evaluation(test_file: str,
         test_cases = [tc for tc in test_cases if tc.id == test_id]
         if not test_cases:
             print(f"Error: Test case with ID '{test_id}' not found")
-            print(f"Available test IDs: {[tc.id for tc in load_testcases(test_file, repo_root)]}")
+            print(f"Available test IDs: {[tc.id for tc in load_testcases(test_file, repo_root, verbose=False)]}")
             return []
         print(f"Filtered to test case: {test_id} (1 of {original_count} total)")
     
@@ -520,7 +556,8 @@ def run_evaluation(test_file: str,
             verbose=verbose,
             max_retries=max_retries,
             target=target,
-            targets=targets
+            targets=targets,
+            prompt_dump_dir=prompt_dump_dir
         )
         results.append(result)
     
@@ -601,7 +638,7 @@ def main():
     except metadata.PackageNotFoundError:
         __version__ = "0.0.0-dev"
 
-    parser = argparse.ArgumentParser(description="Bbeval")
+    parser = argparse.ArgumentParser(description="BbEval")
     parser.add_argument(
         '--version',
         action='version',
@@ -629,8 +666,12 @@ def main():
                        help='Enable DSPy caching for LLM responses')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Verbose output')
+    parser.add_argument('--dump-prompts', dest='dump_prompts',
+                       help='Directory to save the exact request and guidelines sent to the model for each test case')
     
     args = parser.parse_args()
+
+    prompt_dump_dir = Path(args.dump_prompts).resolve() if args.dump_prompts else None
 
     # Load environment variables from .env file only after parsing so we can respect --verbose
     if DOTENV_AVAILABLE:
@@ -721,7 +762,8 @@ def main():
             test_id=args.test_id,
             agent_timeout=args.agent_timeout,
             max_retries=args.max_retries,
-            use_cache=args.cache
+            use_cache=args.cache,
+            prompt_dump_dir=prompt_dump_dir
         )
         
         # Print summary
@@ -729,6 +771,8 @@ def main():
         
         if args.output_file:
             print(f"\nResults written to: {args.output_file}")
+        if prompt_dump_dir and args.verbose:
+            print(f"Prompt payloads saved under: {prompt_dump_dir}")
     
     except Exception as e:
         print(f"Error running evaluation: {e}")

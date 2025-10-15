@@ -34,13 +34,14 @@ def extract_code_blocks(segments: List[dict]) -> List[str]:
     return code_blocks
 
 
-def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
+def load_testcases(test_file_path: str, repo_root: Path, verbose: bool = False) -> List[TestCase]:
     """
     Load test cases from a YAML file.
     
     Args:
         test_file_path: Path to the .test.yaml file
         repo_root: Root directory of the repository for resolving file paths
+        verbose: Whether to print verbose logging about file resolution
     
     Returns:
         List of TestCase objects
@@ -48,6 +49,27 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
     test_path = Path(test_file_path)
     if not test_path.exists():
         raise FileNotFoundError(f"Test file not found: {test_file_path}")
+    # Work with absolute paths for consistent resolution
+    test_path = test_path.resolve()
+    repo_root = repo_root.resolve()
+    cwd_path = Path.cwd().resolve()
+
+    # Build a search order for resolving relative file references. We start from the
+    # directory containing the test file, walk up towards the repository root, and
+    # finally fall back to the current working directory for backwards compatibility.
+    search_roots = []
+    current_dir = test_path.parent
+    while True:
+        if current_dir not in search_roots:
+            search_roots.append(current_dir)
+        if current_dir == repo_root or current_dir.parent == current_dir:
+            break
+        current_dir = current_dir.parent
+
+    if repo_root not in search_roots:
+        search_roots.append(repo_root)
+    if cwd_path not in search_roots:
+        search_roots.append(cwd_path)
     
     with open(test_path, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
@@ -89,30 +111,71 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
             elif isinstance(content, list):
                 for segment in content:
                     if segment.get('type') == 'file':
-                        # Read file content
-                        file_path = segment['value'].lstrip('/')
-                        full_path = repo_root / file_path
-                        
-                        if full_path.exists():
+                        raw_value = segment.get('value')
+                        if not raw_value:
+                            continue
+
+                        file_path_display = raw_value.lstrip('/\\') or raw_value
+                        original_path = Path(raw_value)
+                        relative_path = Path(file_path_display)
+
+                        # Assemble candidate locations in priority order.
+                        potential_paths = []
+                        if original_path.is_absolute():
+                            potential_paths.append(original_path)
+
+                        for base_dir in search_roots:
+                            potential_paths.append(base_dir / relative_path)
+
+                        full_path = None
+                        attempted_paths = []
+                        seen_candidates = set()
+
+                        for candidate in potential_paths:
+                            try:
+                                resolved_candidate = candidate.resolve(strict=False)
+                            except Exception:
+                                resolved_candidate = candidate
+
+                            if resolved_candidate in seen_candidates:
+                                continue
+                            seen_candidates.add(resolved_candidate)
+                            attempted_paths.append(resolved_candidate)
+
+                            if resolved_candidate.exists():
+                                full_path = resolved_candidate
+                                break
+
+                        if full_path:
                             try:
                                 with open(full_path, 'r', encoding='utf-8') as f:
                                     file_content = f.read()
                                 
                                 # Check if this is an instruction or prompt file
-                                if is_guideline_file(file_path):
+                                if is_guideline_file(file_path_display):
                                     # This is a guideline file - add to guideline paths but not to user segments
-                                    guideline_paths.append(file_path)
+                                    # Store the absolute path to avoid resolution issues later
+                                    guideline_paths.append(str(full_path.resolve()))
+                                    if verbose:
+                                        print(f"  [Guideline] Found: {file_path_display}")
+                                        print(f"    Resolved to: {full_path}")
                                 else:
                                     # This is a regular file - add to user segments
                                     user_segments.append({
                                         'type': 'file',
-                                        'path': file_path,
+                                        'path': file_path_display,
                                         'text': file_content
                                     })
+                                    if verbose:
+                                        print(f"  [File] Found: {file_path_display}")
+                                        print(f"    Resolved to: {full_path}")
                             except Exception as e:
                                 print(f"\033[33mWarning: Could not read file {full_path}: {e}\033[0m")
                         else:
-                            print(f"\033[33mWarning: File not found: {full_path}\033[0m")
+                            # Show all attempted paths for better debugging
+                            attempted = "\n    ".join(str(p) for p in attempted_paths)
+                            print(f"\033[33mWarning: File not found: {file_path_display}")
+                            print(f"  Tried:\n    {attempted}\033[0m")
                     else:
                         # Handle text or other segment types
                         user_segments.append(segment)
@@ -147,6 +210,15 @@ def load_testcases(test_file_path: str, repo_root: Path) -> List[TestCase]:
             grader=raw_test.get('grader', global_grader)  # Use test-specific grader or global default
         )
         
+        if verbose:
+            print(f"\n[Test Case: {raw_test['id']}]")
+            if guideline_paths:
+                print(f"  Guidelines used: {len(guideline_paths)}")
+                for gp in guideline_paths:
+                    print(f"    - {gp}")
+            else:
+                print(f"  No guidelines found")
+        
         test_cases.append(test_case)
     
     return test_cases
@@ -162,11 +234,13 @@ def build_prompt_inputs(test_case: TestCase, repo_root: Path) -> dict:
     # Gather guidelines content
     guideline_contents = []
     for path in test_case.guideline_paths:
-        full_path = repo_root / path
+        # Guideline paths are now stored as absolute paths, use them directly
+        full_path = Path(path)
         if full_path.exists():
             try:
                 with open(full_path, 'r', encoding='utf-8') as f:
-                    guideline_contents.append(f"=== {path} ===\n{f.read()}")
+                    # Use just the filename for the header
+                    guideline_contents.append(f"=== {full_path.name} ===\n{f.read()}")
             except Exception as e:
                 print(f"\033[33mWarning: Could not read guideline file {full_path}: {e}\033[0m")
 

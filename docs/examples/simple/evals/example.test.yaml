@@ -4,23 +4,27 @@ target: azure_base
 
 testcases:
 - id: simple-text-conversation
-  outcome: AI responds with helpful code analysis
+  outcome: AI responds with helpful code analysis and mentions SUPERSECRET_INSTRUCTION_MARKER_JAVASCRIPT
   messages:
     - role: system
       content: You are an expert software developer who provides clear, concise code reviews.
     - role: user
-      content: |-
-        Please review this JavaScript function:
-        
-        ```javascript
-        function calculateTotal(items) {
-          let total = 0;
-          for (let i = 0; i < items.length; i++) {
-            total += items[i].price * items[i].quantity;
-          }
-          return total;
-        }
-        ```
+      content:
+        - type: text
+        - value: |-
+            Please review this JavaScript function:
+            
+            ```javascript
+            function calculateTotal(items) {
+              let total = 0;
+              for (let i = 0; i < items.length; i++) {
+                total += items[i].price * items[i].quantity;
+              }
+              return total;
+            }
+            ```
+        - type: file
+          value: /docs/examples/simple/prompts/javascript.instructions.md
     - role: assistant
       content: |-
         The function looks good overall. Here's my analysis:
@@ -36,7 +40,7 @@ testcases:
         - Consider using `const` instead of `let` for the total variable if using reduce
 
 - id: multi-turn-debugging-conversation
-  outcome: AI provides step-by-step debugging assistance and mentions SUPERSECRET_INSTRUCTION_MARKER
+  outcome: AI provides step-by-step debugging assistance and mentions SUPERSECRET_INSTRUCTION_MARKER_PYTHON
   messages:
     - role: system
       content: You are a debugging expert who helps identify and fix code issues systematically. Always follow the provided coding guidelines.
@@ -64,7 +68,7 @@ testcases:
           value: /docs/examples/simple/prompts/python.instructions.md
     - role: assistant
       content: |-
-        The error occurs because `missing.txt` doesn't exist. Following the coding guidelines (SUPERSECRET_INSTRUCTION_MARKER), here's how to fix it with proper error handling:
+        The error occurs because `missing.txt` doesn't exist. Following the coding guidelines (SUPERSECRET_INSTRUCTION_MARKER_PYTHON), here's how to fix it with proper error handling:
         
         **Option 1: Skip missing files**
         ```python
@@ -102,7 +106,7 @@ testcases:
       content: I like option 2, but I want to return a dictionary with filename and size instead of just sizes.
     - role: assistant
       content: |-
-        Perfect! Here's the modified version that returns a dictionary, following proper error handling practices (SUPERSECRET_INSTRUCTION_MARKER):
+        Perfect! Here's the modified version that returns a dictionary, following proper error handling practices (SUPERSECRET_INSTRUCTION_MARKER_PYTHON):
         
         ```python
         def process_files(file_list):
