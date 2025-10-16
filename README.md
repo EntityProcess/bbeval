@@ -8,10 +8,17 @@ A lightweight black-box agent evaluator using YAML specifications to score task 
 
 This is the recommended method for users who want to use `bbeval` as a command-line tool.
 
-1.  **Ensure you have `uv` installed.** If you don't, you can install them via pip:
+1.  **Install `uv` (Python package manager):**
+
     ```bash
-    pip install uv
+    # Windows
+    powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+    # macOS/Linux
+    curl -LsSf https://astral.sh/uv/install.sh | sh
     ```
+
+    Verify installation: `uv --version`
 
 2.  **Install `bbeval`:**
     ```bash
