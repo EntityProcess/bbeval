@@ -47,20 +47,26 @@ Follow these steps if you want to contribute to the `bbeval` project itself. Thi
     cd bbeval
     ```
 
-2.  **Create and activate a virtual environment:**
+2.  **Create a virtual environment:**
 
     ```bash
-    # Create the virtual environment
+    # Create the virtual environment (automatically uses Python 3.12+ from .python-version)
     uv venv
+    ```
 
-    # Activate it (macOS/Linux)
+3.  **Activate the virtual environment:**
+
+    ```bash
+    # On Linux/macOS
     source .venv/bin/activate
-
-    # Activate it (Windows PowerShell)
+    
+    # On Windows (PowerShell)
     .venv\Scripts\Activate.ps1
     ```
 
-3.  **Perform an editable install with development dependencies:**
+4.  **Perform an editable install with development dependencies:**
+    
+    Note: With `uv`, you don't need to manually activate the virtual environment for `uv` commands. However, activation is required to run the installed tools (like `bbeval`) or Python scripts directly.
     
 	This command installs `bbeval` in editable (`-e`) mode and includes the extra tools needed for development and testing (`[dev]`).
 
@@ -134,7 +140,7 @@ Output goes to `.bbeval/results/{testname}_{timestamp}.jsonl` unless `--out` is 
 
 ## Requirements
 
-- Python 3.10+ on PATH
+- Python 3.12+ (automatically managed by `uv` using `.python-version`)
 - Evaluator location: `scripts/agent-eval/`
 - `.env` for credentials/targets (recommended)
 
