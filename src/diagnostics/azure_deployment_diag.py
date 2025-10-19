@@ -12,8 +12,8 @@ from openai import AzureOpenAI
 load_dotenv()
 
 # Get Azure OpenAI configuration
-endpoint = os.getenv("AZURE_OPEN_AI_ENDPOINT")
-api_key = os.getenv("AZURE_OPEN_AI_API_KEY")
+endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+api_key = os.getenv("AZURE_OPENAI_API_KEY")
 model = os.getenv("LLM_MODEL", "gpt-5-chat")
 
 print(f"Endpoint: {endpoint}")
