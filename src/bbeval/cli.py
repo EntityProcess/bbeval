@@ -97,13 +97,13 @@ def create_judge_model(target: Dict, targets: List[Dict], model: str, verbose: b
             print(f"  No judge_target specified, falling back to Azure")
         judge_provider = "azure"
         judge_settings = {
-            'endpoint': 'AZURE_OPEN_AI_ENDPOINT',
-            'api_key': 'AZURE_OPEN_AI_API_KEY'
+            'endpoint': 'AZURE_OPENAI_ENDPOINT',
+            'api_key': 'AZURE_OPENAI_API_KEY'
         }
         judge_model = model
         
         # Check if Azure credentials are available for fallback
-        if not os.getenv('AZURE_OPEN_AI_ENDPOINT') or not os.getenv('AZURE_OPEN_AI_API_KEY'):
+        if not os.getenv('AZURE_OPENAI_ENDPOINT') or not os.getenv('AZURE_OPENAI_API_KEY'):
             if verbose:
                 print(f"  Azure credentials not found, using mock judge")
             judge_provider = "mock"
@@ -494,7 +494,13 @@ def run_evaluation(test_file: str,
     provider = target['provider']
     settings = target.get('settings')
     # For DSPy configuration, we still need a model parameter (but not for results)
-    model = os.getenv('LLM_MODEL', 'gpt-4')
+    # Get model from target settings, resolving env var if needed
+    model = settings.get('model', 'AZURE_DEPLOYMENT_NAME') if settings else 'AZURE_DEPLOYMENT_NAME'
+    if isinstance(model, str) and model in os.environ:
+        model = os.getenv(model, 'gpt-4')
+    elif isinstance(model, str):
+        # Fallback if model string is not an env var name
+        model = 'gpt-4'
     
     # Configure model
     if dry_run:

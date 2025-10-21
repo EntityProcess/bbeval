@@ -15,15 +15,15 @@
   # The base LLM provider needs no extra settings, as the model is
   # defined in the .env file.
   settings:
-    endpoint: AZURE_OPEN_AI_ENDPOINT
-    api_key: AZURE_OPEN_AI_API_KEY
-    model: LLM_MODEL
+    endpoint: AZURE_OPENAI_ENDPOINT
+    api_key: AZURE_OPENAI_API_KEY
+    model: AZURE_DEPLOYMENT_NAME
 
 - name: default
   provider: azure
   # The base LLM provider needs no extra settings, as the model is
   # defined in the .env file.
   settings:
-    endpoint: AZURE_OPEN_AI_ENDPOINT
-    api_key: AZURE_OPEN_AI_API_KEY
-    model: LLM_MODEL
+    endpoint: AZURE_OPENAI_ENDPOINT
+    api_key: AZURE_OPENAI_API_KEY
+    model: AZURE_DEPLOYMENT_NAME
