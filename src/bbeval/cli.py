@@ -494,7 +494,13 @@ def run_evaluation(test_file: str,
     provider = target['provider']
     settings = target.get('settings')
     # For DSPy configuration, we still need a model parameter (but not for results)
-    model = os.getenv('LLM_MODEL', 'gpt-4')
+    # Get model from target settings, resolving env var if needed
+    model = settings.get('model', 'AZURE_DEPLOYMENT_NAME') if settings else 'AZURE_DEPLOYMENT_NAME'
+    if isinstance(model, str) and model in os.environ:
+        model = os.getenv(model, 'gpt-4')
+    elif isinstance(model, str):
+        # Fallback if model string is not an env var name
+        model = 'gpt-4'
     
     # Configure model
     if dry_run:

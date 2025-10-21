@@ -17,7 +17,7 @@
   settings:
     endpoint: AZURE_OPENAI_ENDPOINT
     api_key: AZURE_OPENAI_API_KEY
-    model: LLM_MODEL
+    model: AZURE_DEPLOYMENT_NAME
 
 - name: default
   provider: azure
@@ -26,4 +26,4 @@
   settings:
     endpoint: AZURE_OPENAI_ENDPOINT
     api_key: AZURE_OPENAI_API_KEY
-    model: LLM_MODEL
+    model: AZURE_DEPLOYMENT_NAME

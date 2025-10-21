@@ -169,7 +169,7 @@ Each target specifies:
   settings:
     endpoint: "AZURE_OPENAI_ENDPOINT"
     api_key: "AZURE_OPENAI_API_KEY"
-    model: "LLM_MODEL"
+    model: "AZURE_DEPLOYMENT_NAME"
 ```
 
 **Anthropic targets:**
@@ -178,7 +178,7 @@ Each target specifies:
   provider: anthropic
   settings:
     api_key: "ANTHROPIC_API_KEY"
-    model: "LLM_MODEL"
+    model: "ANTHROPIC_MODEL"
 ```
 
 **VS Code targets:**
