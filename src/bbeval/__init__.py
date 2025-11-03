@@ -11,7 +11,7 @@ from typing import Literal, Optional
 @dataclass
 class TestMessage:
     """Represents a single message in a test conversation."""
-    role: Literal['user', 'assistant']
+    role: Literal['system', 'user', 'assistant', 'tool']
     content: list[dict] | str
 
 @dataclass 
