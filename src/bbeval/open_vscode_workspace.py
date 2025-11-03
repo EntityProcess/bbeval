@@ -82,15 +82,20 @@ def get_code_cli() -> str:
         return os.environ["CODE_CLI_PATH"]
     
     # shutil.which checks the system's PATH
+    # Check for code-insiders first, then fallback to code
+    if cli_path := shutil.which('code-insiders'):
+        return cli_path
+    if _IS_WINDOWS and (cli_path := shutil.which('code-insiders.cmd')):
+        return cli_path
     if cli_path := shutil.which('code'):
         return cli_path
     if _IS_WINDOWS and (cli_path := shutil.which('code.cmd')):
         return cli_path
 
-    raise FileNotFoundError("VS Code CLI not found. Ensure 'code' is on PATH or set CODE_CLI_PATH.")
+    raise FileNotFoundError("VS Code CLI not found. Ensure 'code' or 'code-insiders' is on PATH or set CODE_CLI_PATH.")
 
 
-def focus_vscode_window(workspace_path: Path) -> bool:
+def focus_vscode_window(workspace_path: Path, code_cli: str) -> bool:
     """
     On Windows, polls for and attempts to bring the VS Code window to the foreground.
     This is a best-effort operation.
@@ -100,6 +105,7 @@ def focus_vscode_window(workspace_path: Path) -> bool:
         
     title_key = workspace_path.stem  # Filename without extension
     deadline = time.monotonic() + 10  # 10-second timeout
+    is_insiders = 'insiders' in code_cli.lower()
     
     hwnd = [None] # Use a list to allow modification inside the callback
     
@@ -121,7 +127,9 @@ def focus_vscode_window(workspace_path: Path) -> bool:
                 except (ImportError, Exception):
                     pass # psutil not installed or process exited, fallback to title check
 
-                if proc_name.lower() in ('code.exe', 'code - insiders.exe'):
+                # Match based on which CLI was used
+                expected_names = ['code - insiders.exe', 'code-insiders.exe'] if is_insiders else ['code.exe']
+                if any(name in proc_name.lower() for name in expected_names):
                      hwnd[0] = handle
 
     while time.monotonic() < deadline:
@@ -177,7 +185,7 @@ def open_and_focus_workspace(workspace_path: str, focus: bool = False, verbose: 
                 if _HAS_WIN32_MODULES:
                     # Give VS Code a moment to start before trying to focus
                     time.sleep(1.0)
-                    focused = focus_vscode_window(ws_path)
+                    focused = focus_vscode_window(ws_path, code_cli)
                 else:
                     if verbose:
                         print("  Focus requested but win32 modules not available; skipping focus.", file=sys.stderr)
@@ -224,7 +232,7 @@ def main():
         if args.focus:
             if _IS_WINDOWS:
                 if _HAS_WIN32_MODULES:
-                    focused = focus_vscode_window(ws_path)
+                    focused = focus_vscode_window(ws_path, code_cli)
                 else:
                     print("  Focus requested but win32 modules not available; skipping focus.", file=sys.stderr)
             else:
