@@ -244,7 +244,7 @@ def _run_test_case_grading(
                 
                 # For VSCode provider, we need to temporarily switch to a standard model for judging
                 # to avoid double JSON wrapping and incorrect file naming
-                if provider.lower() == "vscode":
+                if provider.lower() in ["vscode", "vscode-insiders"]:
                     if verbose:
                         print(f"  Detected VSCode provider, switching to judge model...")
                     # Save current model
