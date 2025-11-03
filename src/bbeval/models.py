@@ -134,6 +134,9 @@ class VSCodeCopilot(dspy.BaseLM):
     Uses session-based temporary files to avoid race conditions between tests.
     """
     
+    # Class attribute to define the CLI command to use
+    vscode_command = 'code'
+    
     def __init__(self, workspace_path: str, workspace_env_var: str, polling_timeout: int = 120, verbose: bool = False, **kwargs):
         super().__init__(model="vscode-copilot", **kwargs)
         self.workspace_path = workspace_path
@@ -254,11 +257,11 @@ class VSCodeCopilot(dspy.BaseLM):
             # The 'code' executable must be on PATH (VS Code's 'Shell Command: Install 'code'' setting on macOS,
             # or automatically available on Windows after install).
             import shutil
-            code_cli = shutil.which('code')
+            code_cli = shutil.which(self.vscode_command)
             if not code_cli:
-                return ("Error: VS Code CLI 'code' was not found on PATH. "
-                        "Ensure VS Code is installed and the command line launcher is enabled. "
-                        "On Windows this is usually automatic; on macOS use the Command Palette: 'Shell Command: Install code command'.")
+                return (f"Error: VS Code CLI '{self.vscode_command}' was not found on PATH. "
+                        f"Ensure VS Code is installed and the command line launcher is enabled. "
+                        f"On Windows this is usually automatic; on macOS use the Command Palette: 'Shell Command: Install {self.vscode_command} command'.")
 
             cmd = [code_cli, 'chat', '-r', chat_instruction]
             
@@ -505,12 +508,28 @@ class VSCodeCopilot(dspy.BaseLM):
         result.answer = answer_content
         return result
 
+class VSCodeInsidersCopilot(VSCodeCopilot):
+    """VS Code Insiders Copilot model that uses the preview version of VS Code.
+    
+    This class extends VSCodeCopilot to use the 'code-insiders' CLI command
+    instead of the stable 'code' command, allowing evaluation against the
+    preview/insiders build of VS Code.
+    """
+    
+    # Override the CLI command to use VS Code Insiders
+    vscode_command = 'code-insiders'
+    
+    def __init__(self, workspace_path: str, workspace_env_var: str, polling_timeout: int = 120, verbose: bool = False, **kwargs):
+        super().__init__(workspace_path, workspace_env_var, polling_timeout, verbose, **kwargs)
+        # Update the model name to reflect Insiders
+        self.model = "vscode-insiders-copilot"
+
 def create_model(provider: str, model: str, settings: Dict[str, Any] = None, verbose: bool = False, **kwargs):
     """
     Factory function to create model instances based on provider.
     
     Args:
-        provider: 'anthropic', 'azure', 'vscode', or 'mock'
+        provider: 'anthropic', 'azure', 'vscode', 'vscode-insiders', or 'mock'
         model: Model name/deployment
         settings: Provider-specific settings from targets.yaml
         verbose: Whether to print verbose output
@@ -539,6 +558,20 @@ def create_model(provider: str, model: str, settings: Dict[str, Any] = None, ver
         # Extract polling timeout from kwargs, default to 120 seconds
         polling_timeout = kwargs.pop('polling_timeout', 120)
         return VSCodeCopilot(workspace_path=workspace_path, workspace_env_var=workspace_env_var, polling_timeout=polling_timeout, verbose=verbose, **kwargs)
+    elif provider == "vscode-insiders":
+        # Get environment variable name from target settings
+        workspace_env_var = settings.get('workspace_env_var')
+        if not workspace_env_var:
+            raise ValueError("VS Code Insiders 'settings' in targets.yaml must define 'workspace_env_var'")
+        
+        # Fetch value from the environment using the name specified in the YAML
+        workspace_path = os.getenv(workspace_env_var)
+        if not workspace_path:
+            raise ValueError(f"Environment variable '{workspace_env_var}' is not set.")
+        
+        # Extract polling timeout from kwargs, default to 120 seconds
+        polling_timeout = kwargs.pop('polling_timeout', 120)
+        return VSCodeInsidersCopilot(workspace_path=workspace_path, workspace_env_var=workspace_env_var, polling_timeout=polling_timeout, verbose=verbose, **kwargs)
     elif provider == "anthropic":
         # Get environment variable names from target settings
         api_key_var = settings.get('api_key')
@@ -591,7 +624,7 @@ def create_model(provider: str, model: str, settings: Dict[str, Any] = None, ver
     elif provider == "mock":
         return MockModel(**kwargs)
     else:
-        raise ValueError(f"Unsupported provider: {provider}. Supported: anthropic, azure, vscode, mock")
+        raise ValueError(f"Unsupported provider: {provider}. Supported: anthropic, azure, vscode, vscode-insiders, mock")
 
 def configure_dspy_model(provider: str, model: str, settings: Dict[str, Any] = None, verbose: bool = False, **kwargs):
     """

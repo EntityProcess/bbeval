@@ -157,7 +157,7 @@ Execution targets in `.bbeval/targets.yaml` decouple tests from providers/settin
 
 Each target specifies:
 - `name`: Unique identifier for the target
-- `provider`: The model provider (`azure`, `anthropic`, `vscode`, or `mock`)
+- `provider`: The model provider (`azure`, `anthropic`, `vscode`, `vscode-insiders`, or `mock`)
 - `settings`: Environment variable names to use for this target
 
 ### Examples
@@ -185,6 +185,11 @@ Each target specifies:
 ```yaml
 - name: vscode_projectx
   provider: vscode
+  settings:
+    workspace_env_var: "EVAL_PROJECTX_WORKSPACE_PATH"
+
+- name: vscode_insiders_projectx
+  provider: vscode-insiders
   settings:
     workspace_env_var: "EVAL_PROJECTX_WORKSPACE_PATH"
 ```
