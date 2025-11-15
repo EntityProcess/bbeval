@@ -1,6 +1,8 @@
-# BbEval
+# BbEval (Deprecated)
 
-A lightweight black-box agent evaluator using YAML specifications to score task completion.
+**This project has been rebranded as [AgentEvo](https://github.com/EntityProcess/agentevo) and is no longer maintained. Please use AgentEvo for new evaluations.**
+
+BbEval is a lightweight black-box agent evaluator using YAML specifications to score task completion.
 
 ## Installation and Setup
 
